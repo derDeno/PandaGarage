@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en" style="--bs-primary: #6710f5;--bs-primary-rgb: 103,16,245;">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>PandaGarage</title>
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/css/styles.min.css">
+</head>
+
+<body style="background: rgb(214,214,214);">
+    <nav class="navbar navbar-expand-md bg-dark py-3" data-bs-theme="dark">
+        <div class="container"><a class="navbar-brand d-flex align-items-center" href="/"><img class="inverted-logo" src="assets/img/icon.svg"><span style="padding-left: 10px;">PandaGarage</span></a><button data-bs-toggle="collapse" class="navbar-toggler" data-bs-target="#navcol-5"><span class="visually-hidden">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navcol-5">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/" i18n="nav-dashboard">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/info" i18n="nav-info">Info</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/logs" i18n="nav-logs">Logs</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/settings" i18n="nav-settings">Settings</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container" style="padding-top: 20px;">
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" i18n="title-info-device">Device Info</h4>
+                <div class="table-responsive d-xl-flex" style="padding-bottom: 10px;">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td class="table-spacer" i18n="text-device-name">Device Name</td>
+                                <td>%TEMPLATE_DEVICE_NAME%</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-wifi-strength">WiFi Signal Strength</td>
+                                <td><img id="wifi-icon" width="30px" height="30px" src="%TEMPLATE_WIFI_ICON%" style="margin-right: 5px;">&nbsp;%TEMPLATE_WIFI_SIGNAL% db</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-ip">IP Address</td>
+                                <td>%TEMPLATE_IP%</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-mac">MAC Address</td>
+                                <td class="ms-0">%TEMPLATE_MAC%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-responsive d-xl-flex" style="padding-bottom: 10px;">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td class="table-spacer" i18n="text-uptime">Uptime</td>
+                                <td>%TEMPLATE_UPTIME%</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-local-time">Local Time</td>
+                                <td>%TEMPLATE_LOCAL_TIME%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-responsive d-xl-flex" style="padding-bottom: 10px;">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td class="table-spacer" i18n="text-version-fw">Firmware Version</td>
+                                <td>%TEMPLATE_VERSION_FW%</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-version-fs">Version Filesystem</td>
+                                <td>%TEMPLATE_VERSION_FS%</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-version-hw">Hardware Version</td>
+                                <td>%TEMPLATE_VERSION_HW%</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-serial">Device Serial</td>
+                                <td>%TEMPLATE_DEVICE_SERIAL%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" i18n="title-info-general">General Info</h4>
+                <div class="table-responsive">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td style="width: 30%;" i18n="text-author">Author</td>
+                                <td>DNO</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-github">GitHub</td>
+                                <td><a href="https://github.com/derDeno/PandaGarage" style="color: var(--bs-primary);">github.com/derDeno/PandaGarage</a></td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-docs">Documentation</td>
+                                <td><a href="https://derdeno.github.io/PandaGarage" style="color: var(--bs-primary);">derdeno.github.io/PandaGarage</a></td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-changelog">Changelog</td>
+                                <td><a href="https://github.com/derDeno/PandaGarage/tree/master/latest" style="color: var(--bs-primary);">github.com/derDeno/PandaGarage/tree/master/latest</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="assets/js/auth.min.js"></script>
+    <script src="assets/js/x-last.min.js"></script>
+</body>
+
+</html>

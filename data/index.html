@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en" style="--bs-primary: #6710f5;--bs-primary-rgb: 103,16,245;">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>PandaGarage</title>
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/css/styles.min.css">
+</head>
+
+<body style="background: #d6d6d6;">
+    <nav class="navbar navbar-expand-md bg-dark py-3" data-bs-theme="dark">
+        <div class="container"><a class="navbar-brand d-flex align-items-center" href="/"><img class="inverted-logo" src="assets/img/icon.svg"><span style="padding-left: 10px;">PandaGarage</span></a><button data-bs-toggle="collapse" class="navbar-toggler" data-bs-target="#navcol-5"><span class="visually-hidden">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navcol-5">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link active" href="/" i18n="nav-dashboard">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/info" i18n="nav-info">Info</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/logs" i18n="nav-logs">Logs</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/settings" i18n="nav-settings">Settings</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container" style="margin-top: 20px;">
+        <div class="row" id="alert-update">
+            <div class="col">
+                <div class="alert alert-warning" role="alert"><span i18n="alert-fw-update-title"><strong>Update available!</strong></span><span style="padding-left: 5px;padding-right: 5px;" i18n="alert-fw-update-text">New firmware version is available.</span><a class="alert-link" href="https://github.com/derDeno/PandaGarage/releases/latest/" target="_blank" i18n="alert-fw-update-link"><span style="font-weight: normal !important;">Check here</span></a></div>
+            </div>
+        </div>
+    </div>
+    <div class="container" style="margin-top: 10px;">
+        <div class="row row-cols-1 row-cols-sm-1 row-cols-md-2 row-cols-lg-2 row-cols-xl-2 row-cols-xxl-2 justify-content-center">
+            <div class="col-8" style="margin-bottom: 15px;">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="text-center" id="door-container" style="margin-bottom: 15px;"></div>
+                        <div class="text-center"><span i18n="text-door-status">Status:&nbsp;</span><strong id="door-status-val" i18n="text-door-status-val">not connected</strong></div>
+                        <div class="text-center"><span i18n="text-door-position">Position:&nbsp;</span><strong id="door-position-val">not connected</strong></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col" style="margin-bottom: 15px;">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row" style="margin-bottom: 20px;">
+                            <div class="col-3 text-start"><button class="btn btn-success btn-lg" id="btn-door-up" type="button" style="width: 100%;" _i18n="btn-up"><span style="transform: rotate(270deg);display: inline-block;">➜</span></button></div>
+                            <div class="col text-center align-self-center">
+                                <div class="form-check form-switch form-check-inline text-start"><input class="form-check-input" type="checkbox" id="switch-light" style="height: 24px;width: 48px;"><label class="form-check-label fs-5" for="switch-light" i18n="btn-light" style="padding-left: 10px;">Light</label></div>
+                            </div>
+                        </div>
+                        <div class="row" style="margin-bottom: 20px;">
+                            <div class="col-3 text-start"><button class="btn btn-danger btn-lg" id="btn-door-stop" type="button" style="width: 100%;" _i18n="btn-stop">■</button></div>
+                            <div class="col text-center align-self-center"><button class="btn btn-info" id="btn-door-half" type="button" style="width: 100%;" i18n="btn-half">Half</button></div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3 text-start"><button class="btn btn-success btn-lg" id="btn-door-down" type="button" style="width: 100%;" _i18n="btn-down"><span style="display: inline-block;transform: rotate(90deg);">➜</span></button></div>
+                            <div class="col text-center align-self-center"><button class="btn btn-warning" id="btn-door-vent" type="button" style="width: 100%;" i18n="btn-venr">Vent</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container" style="margin-top: 20px;">
+        <div class="row row-cols-sm-2 row-cols-lg-4" id="sensor-row">
+            <div class="col" style="margin-bottom: 15px;">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title" i18n="title-temp">Temperature</h5>
+                        <div class="row row-cols-2">
+                            <div class="col-auto align-self-end">
+                                <h1 class="text-end" id="dash-temp">-</h1>
+                            </div>
+                            <div class="col-auto align-self-start">
+                                <h3 class="text-start">°C</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col" style="margin-bottom: 15px;">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title" i18n="title-humidity">Humidity</h5>
+                        <div class="row row-cols-2">
+                            <div class="col-auto align-self-end">
+                                <h1 class="text-end" id="dash-hum">-</h1>
+                            </div>
+                            <div class="col-auto align-self-start">
+                                <h3 class="text-start">%</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col" style="margin-bottom: 15px;">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title" i18n="title-light">Light</h5>
+                        <div class="row row-cols-2">
+                            <div class="col-auto align-self-end">
+                                <h1 class="text-end" id="dash-lux">-</h1>
+                            </div>
+                            <div class="col-auto align-self-start">
+                                <h3 class="text-start">lux</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col" id="dash-ext-card" style="margin-bottom: 15px;">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title" id="dash-ext-title">-</h5>
+                        <div class="row row-cols-2">
+                            <div class="col-auto align-self-end">
+                                <h1 class="text-end" id="dash-ext-val">-</h1>
+                            </div>
+                            <div class="col-auto align-self-start">
+                                <h3 class="text-start" id="dash-ext-unit">-</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="assets/js/auth.min.js"></script>
+    <script src="assets/js/dashboard.min.js"></script>
+    <script src="assets/js/x-last.min.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en" style="--bs-primary: #6710f5;--bs-primary-rgb: 103,16,245;">
+
+<head>
+    <meta charset="utf-8">
+<base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>PandaGarage</title>
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/css/styles.min.css">
+</head>
+
+<body style="background: rgb(214,214,214);">
+    <nav class="navbar navbar-expand bg-dark py-3" data-bs-theme="dark">
+        <div class="container"><a class="navbar-brand d-flex align-items-center" href="#"><img class="inverted-logo" src="assets/img/icon.svg"><span style="padding-left: 10px;">PandaGarage&nbsp;</span></a>
+            <div class="collapse navbar-collapse flex-grow-0 order-md-first" id="navcol-6"></div>
+            <div class="d-none d-md-block"></div>
+        </div>
+    </nav>
+    <div class="container" id="onboarding-1" style="margin-top: 20px;">
+        <p class="lh-base text-center" id="heading-welcome" i18n="title-welcome"><strong>Welcome to your PandaGarage</strong></p>
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title" i18n="title-lets-start">Let's get started!</h4>
+                <p class="card-text" i18n="text-lets-start">Before connecting to your garage door, let's complete the device setup.</p>
+                <div class="row text-center">
+                    <div class="col"><button class="btn btn-primary btn-lg text-center" id="btn-onboard-1" type="button" i18n="btn-go">Let's go!</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container" id="onboarding-2" style="margin-top: 20px;">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title" i18n="title-set-device-name">Set your Device Name</h4>
+                <p class="card-text" i18n="text-set-device-name">Below is the default device name. You can change it if you'd like — this is how the device will appear on your local network and in your smart home system. You can also update it later in the settings.</p>
+                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-device-name">Device Name</span><input class="form-control" type="text" id="pref-onboarding-name"></div>
+                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-device-language">WebUI Language</span><select class="form-select" id="pref-device-language">
+                        <option value="en" selected="">English</option>
+                        <option value="de">Deutsch</option>
+                        <option value="fr">Français</option>
+                        <option value="es">Espagnol</option>
+                        <option value="it">Italiano</option>
+                        <option value="nl">Nederlands</option>
+                    </select></div>
+                <div class="row text-center">
+                    <div class="col"><button class="btn btn-primary btn-lg text-center" id="btn-onboard-2" type="button" i18n="btn-next-step">Next step</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container" id="onboarding-3" style="margin-top: 20px;">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title" i18n="title-connect-wifi-1">Connect to your local Network</h4>
+                <p i18n="text-connect-wifi">Please connect your PandaGarage to your local network to proceed.</p>
+                <div class="row">
+                    <div class="col"><button class="btn btn-primary" id="btn-scan-networks" type="button" i18n="btn-scan-network">Scan Networks</button><span class="spinner-border" role="status" id="spinner-network-scan" style="color: var(--bs-primary);"></span></div>
+                </div>
+                <div class="row" id="network-container" style="margin-top: 20px;">
+                    <div class="col">
+                        <h5 i18n="title-found-networks">Found Networks</h5>
+                        <ul class="list-group" id="network-group">
+                            <li class="list-group-item" id="network-item-1"><span>WiFi #1</span></li>
+                            <li class="list-group-item" id="network-item-other"><span i18n="text-other-network">Other Network</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container" id="onboarding-4" style="margin-top: 20px;margin-bottom: 40px;">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title" i18n="title-ready">Ready to go</h4>
+                <p class="card-text" i18n="text-ready-1" style="margin: 0px;"><strong>Your PandaGarage has successfully connected to your local network!</strong></p>
+                <p class="card-text" i18n="text-ready-2">After clicking 'Restart now', you'll need to reconnect using the IP address and login using the password shown below.</p>
+                <div class="table-responsive" style="margin-top: 10px;">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td style="width: 30%;" i18n="text-panda-ssid">Network SSID</td>
+                                <td id="device-ssid">%SSID%</td>
+                            </tr>
+                            <tr>
+                                <td style="width: 30%;" i18n="text-panda-ip">PandaGarage IP</td>
+                                <td id="device-ip">%IP__ADDRESS%</td>
+                            </tr>
+                            <tr>
+                                <td i18n="text-panda-pwd">Default Login Password</td>
+                                <td id="device-pwd">%PASSWORD%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="row text-center">
+                    <div class="col"><button class="btn btn-primary btn-lg text-center" id="btn-onboard-4" type="button" i18n="btn-restart-now">Restart now</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" role="dialog" tabindex="-1" id="modal-connect">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" i18n="title-verify-connection">Verifying connection</h4>
+                </div>
+                <div class="modal-body">
+                    <p id="msg-check-connection" i18n="text-verify-connection">Checking connection, please wait...</p>
+                    <p id="msg-connection-fail" i18n="text-connection-failed"><strong><span style="color: rgb(255, 0, 0);">Connection failed!</span></strong></p>
+                    <p id="msg-connection-success" i18n="text-connection-success"><strong><span style="color: rgb(0, 157, 0);">Connection successful!</span></strong></p>
+                </div>
+                <div class="modal-footer"><button class="btn btn-secondary" id="btn-cancel" type="button" data-bs-dismiss="modal" style="border-color: var(--bs-secondary);" i18n="btn-close">Close</button></div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" role="dialog" tabindex="-1" id="modal-network-details">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" i18n="title-connect-wifi-2">Connect to WiFi</h4><button class="btn-close" id="btn-modal-details-close" type="button" aria-label="Close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-network"><label class="form-label" i18n="text-connect-ssid">Network name (SSID)</label><input class="form-control" type="text" id="network-ssid"><label class="form-label" style="margin-top: 15px;" i18n="text-connect-pwd">Network password (leave blank if none)</label><input class="form-control" type="password" id="network-passphrase"></form>
+                </div>
+                <div class="modal-footer"><button class="btn btn-primary" id="network-connect" type="submit" style="background: var(--bs-primary);border-color: var(--bs-primary);" i18n="btn-save-connect">Save &amp; Connect</button></div>
+            </div>
+        </div>
+    </div>
+    <script src="assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="assets/js/captive.min.js"></script>
+    <script src="assets/js/x-last.min.js"></script>
+</body>
+
+</html>

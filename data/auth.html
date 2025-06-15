@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en" style="--bs-primary: #6710f5;--bs-primary-rgb: 103,16,245;">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>PandaGarage</title>
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="assets/img/icon.svg">
+    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/css/styles.min.css">
+</head>
+
+<body style="background: rgb(214,214,214);">
+    <div class="container text-start" style="text-align: center;height: 100vh;width: 30%;margin-top: 10%;">
+        <div class="alert alert-danger" role="alert" id="alert-no-auth"><strong i18n="alert-error">Error:&nbsp;</strong><span i18n="alert-no-auth">You are not authenticated, please login!</span></div>
+        <div class="alert alert-danger" role="alert" id="alert-wrong-password"><strong i18n="">Error:&nbsp;</strong><span i18n="alert-wrong-pwd">The entered password is wrong!</span></div>
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col"><img src="assets/img/icon.svg" style="filter: invert(0%);width: 100px;">
+                        <h3 style="margin-bottom: 20px;">PandaGarage</h3>
+                    </div>
+                </div>
+                <div class="row" style="margin-bottom: 10px;">
+                    <div class="col">
+                        <div class="input-group" style="width: 100%;"><span class="input-group-text" i18n="input-pwd">Password</span><input class="form-control" type="password" id="auth_login"></div>
+                    </div>
+                </div>
+                <div class="row" style="margin-bottom: 10px;">
+                    <div class="col"><button class="btn btn-primary" id="btn-login" type="button" style="width: 100%;" i18n="btn-login">Login</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="assets/js/auth.min.js"></script>
+    <script src="assets/js/x-last.min.js"></script>
+</body>
+
+</html>

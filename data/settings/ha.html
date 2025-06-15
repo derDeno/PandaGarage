@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en" style="--bs-primary: #6710f5;--bs-primary-rgb: 103,16,245;">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>PandaGarage</title>
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="stylesheet" href="../assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/css/styles.min.css">
+</head>
+
+<body style="background: #d6d6d6;">
+    <nav class="navbar navbar-expand-md bg-dark py-3" data-bs-theme="dark">
+        <div class="container"><a class="navbar-brand d-flex align-items-center" href="/"><img class="inverted-logo" src="../assets/img/icon.svg"><span style="padding-left: 10px;">PandaGarage</span></a><button data-bs-toggle="collapse" class="navbar-toggler" data-bs-target="#navcol-5"><span class="visually-hidden">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navcol-5">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/" i18n="nav-dashboard">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/info" i18n="nav-info">Info</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/logs" i18n="nav-logs">Logs</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/settings" i18n="nav-settings">Settings</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container" style="padding-top: 20px;">
+        <div class="alert alert-success" role="alert" id="alert-saved-ha-settings"><strong i18n="alert-ha">Home Assistant settings saved successfuly</strong></div>
+        <div class="row" style="padding-bottom: 10px;">
+            <div class="col"><a class="btn btn-secondary" role="button" href="/settings" i18n="btn-return-settings">❮ Settings</a></div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" style="padding-bottom: 15px;" i18n="title-ha">Home Assistant Connection</h4>
+                <p i18n="text-ha">After entering your credentials, click 'Test Connection' to verify and save them.</p>
+                <div class="form-check form-switch" style="padding-bottom: 10px;"><input class="form-check-input" type="checkbox" id="pref-ha"><label class="form-check-label" for="pref-ha" i18n="input-activate">Activate</label></div>
+                <div id="input-container">
+                    <div class="input-group" style="padding-bottom: 10px;"><span class="input-group-text" i18n="input-ip">IP Address</span><input class="form-control" type="text" id="pref-ha-ip"></div>
+                    <div class="input-group" style="padding-bottom: 10px;"><span class="input-group-text" i18n="input-port">Port</span><input class="form-control" type="text" id="pref-ha-port"></div>
+                    <div class="input-group" style="padding-bottom: 10px;"><span class="input-group-text" i18n="input-user">Username</span><input class="form-control" type="text" id="pref-ha-user"></div>
+                    <div class="input-group" style="padding-bottom: 10px;"><span class="input-group-text" i18n="input-pwd">Password</span><input class="form-control" type="password" id="pref-ha-pwd"><button class="btn btn-secondary" id="btn-toggle-pwd" type="button"><img id="pwd-icon" src="../assets/img/eye.svg" width="25px" height="25px"></button></div><button class="btn btn-primary" id="btn-save" type="button" i18n="btn-save">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="../assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../assets/js/auth.min.js"></script>
+    <script src="../assets/js/settings-ha.min.js"></script>
+    <script src="../assets/js/x-last.min.js"></script>
+</body>
+
+</html>
