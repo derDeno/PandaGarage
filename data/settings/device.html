@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en" style="--bs-primary: #6710f5;--bs-primary-rgb: 103,16,245;">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>PandaGarage</title>
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="stylesheet" href="../assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/css/styles.min.css">
+</head>
+
+<body style="background: #d6d6d6;">
+    <nav class="navbar navbar-expand-md bg-dark py-3" data-bs-theme="dark">
+        <div class="container"><a class="navbar-brand d-flex align-items-center" href="/"><img class="inverted-logo" src="../assets/img/icon.svg"><span style="padding-left: 10px;">PandaGarage</span></a><button data-bs-toggle="collapse" class="navbar-toggler" data-bs-target="#navcol-5"><span class="visually-hidden">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navcol-5">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/" i18n="nav-dashboard">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/info" i18n="nav-info">Info</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/logs" i18n="nav-logs">Logs</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/settings" i18n="nav-settings">Settings</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container" id="content" style="padding-top: 20px;">
+        <div class="alert alert-success" role="alert" id="alert-saved-device"><strong i18n="alert-device">Device settings saved successfuly!</strong></div>
+        <div class="row" style="padding-bottom: 10px;">
+            <div class="col"><a class="btn btn-secondary" role="button" href="/settings" i18n="btn-return-settings">❮ Settings</a></div>
+            <div class="col text-end"><button class="btn btn-primary" id="btn-save" type="button" i18n="btn-save">Save</button></div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" style="padding-bottom: 15px;" i18n="title-device">Device Configuration</h4>
+                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-device-name">Device Name</span><input class="form-control" type="text" id="pref-device-name"></div>
+                <div class="input-group"><span class="input-group-text" i18n="input-device-language">WebUI Language</span><select class="form-select" id="pref-device-language">
+                        <option value="en" selected="">English</option>
+                        <option value="de">Deutsch</option>
+                        <option value="fr">Français</option>
+                        <option value="es">Espagnol</option>
+                        <option value="it">Italiano</option>
+                        <option value="nl">Nederlands</option>
+                    </select></div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" style="padding-bottom: 15px;" i18n="title-sensors">Sensors</h4>
+                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-temp">Temperature</span><select class="form-select" id="pref-device-sensor-unit">
+                        <option value="0" selected="">Celsius</option>
+                        <option value="1">Fahrenheit</option>
+                    </select></div>
+                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-sensor-update">Update Interval (ms)</span><input class="form-control" type="number" id="pref-device-sensor-update" min="500" max="600000" step="100"></div>
+                <p style="margin: 0px;margin-bottom: 10px;margin-top: 10px;padding-top: 10px;" i18n="text-sensor-threshold">These values define the thresholds for registering changes. For example, a temperature threshold of 1 means that temperature fluctuations will only be recorded and displayed when the reading varies by at least one degree Celsius.</p>
+                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-threshold-temp">Temperature Threshold</span><input class="form-control" type="number" id="pref-device-threshold-temp" step=".5"></div>
+                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-threshold-hum">Humidity Threshold</span><input class="form-control" type="number" id="pref-device-threshold-hum" step="1"></div>
+                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-threshold-lux">Light Threshold</span><input class="form-control" type="number" id="pref-device-threshold-lux" step="10"></div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" style="padding-bottom: 15px;" i18n="title-sensors-ext">External Sensors</h4>
+                <p i18n="text-sensor-ext-1" style="margin: 0px;">If you've connected an external sensor to the I2C header, turn on this option and choose your sensor from the dropdown list.</p>
+                <p i18n="text-sensor-ext-2">Can't find your sensor? You might need to update the firmware yourself or open an issue on GitHub so it can be added in a future update.</p>
+                <div class="form-check form-switch" style="margin-bottom: 10px;"><input class="form-check-input" type="checkbox" id="pref-device-sensor-external-set"><label class="form-check-label" for="pref-device-sensor-external-set" i18n="input-activate">Activate</label></div>
+                <div id="pref-device-sensor-external-group">
+                    <div class="input-group"><span class="input-group-text" i18n="input-sensor-ext">External Sensor</span><select class="form-select" id="pref-device-sensor-external">
+                            <option value="0" selected="">Select an option</option>
+                            <option value="1">AHT10 - Temperature &amp; Humidity</option>
+                            <option value="2">SCD40 - CO2 Sensor</option>
+                            <option value="3">SCD41 - CO2 Sensor</option>
+                            <option value="4">CCS811 - CO2 Sensor</option>
+                        </select></div>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" style="padding-bottom: 15px;" i18n="title-buzzer">Buzzer</h4>
+                <p i18n="text-buzzer">Activate the onboard buzzer and select the different sounds and options for it.</p>
+                <div class="form-check form-switch" style="margin-bottom: 10px;"><input class="form-check-input" type="checkbox" id="pref-device-buzzer-set"><label class="form-check-label" for="pref-device-buzzer-set" i18n="input-activate">Activate</label></div>
+                <div id="pref-device-buzzer-group">
+                    <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-buzzer-tune">Tune</span><select class="form-select" id="pref-device-buzzer-tune">
+                            <option value="0" selected="">Select an option</option>
+                            <option value="1">Tune 1</option>
+                            <option value="2">Tune 2</option>
+                            <option value="3">Tune 3</option>
+                        </select><button class="btn btn-primary" id="btn-buzzer-play" type="button" i18n="btn-play">Play</button></div>
+                    <div class="form-check form-switch" style="margin-bottom: 10px;"><input class="form-check-input" type="checkbox" id="pref-device-buzzer-opening"><label class="form-check-label" for="pref-device-buzzer-opening" i18n="input-buzzer-open">Play on door opening</label></div>
+                    <div class="form-check form-switch" style="margin-bottom: 10px;"><input class="form-check-input" type="checkbox" id="pref-device-buzzer-closing"><label class="form-check-label" for="pref-device-buzzer-closing" i18n="input-buzzer-close">Play on door closing</label></div>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" id="i18n" style="padding-bottom: 15px;" i18n="title-logging">Logging</h4>
+                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="pref-device-access-logging"><label class="form-check-label" for="pref-device-access-logging" i18n=""><strong i18n="input-log-access">Access logging:&nbsp;</strong><span i18n="text-log-access">Keeps a record of every garage door interaction made through PandaGarage</span></label></div>
+                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="pref-device-debug-logging"><label class="form-check-label" for="pref-device-debug-logging" i18n=""><strong i18n="input-log-debug">Debug logging:&nbsp;</strong><span i18n="text-log-debug">Records various internal actions of PandaGarage to help with troubleshooting and debugging</span></label></div><button class="btn btn-secondary" id="btn-diagnose" type="button" style="margin-top: 10px;" i18n="btn-diagnose">Download Diagnostics</button>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-body">
+                <h4 class="card-title" style="padding-bottom: 15px;" i18n="title-reset-device-1">Reset Device</h4>
+                <p><span i18n="text-reset-device-1"><br>Reset your device to factory settings.</span><strong i18n="text-reset-device-2">THIS WILL DELETE YOUR SETTINGS!</strong></p><button class="btn btn-danger" id="btn-reset" type="button" i18n="btn-reset">RESET</button>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" role="dialog" tabindex="-1" id="modal-reset">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title text-danger" i18n="title-reset-device-2">Reset to factory settings</h4><button class="btn-close" id="btn-modal-close" type="button" aria-label="Close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p i18n="text-reset-device-3">Do you really want to reset your PandaGarage to factory settings?</p>
+                </div>
+                <div class="modal-footer"><button class="btn btn-danger" id="btn-reset-modal" type="button" i18n="btn-reset-verify">Yes, Reset</button></div>
+            </div>
+        </div>
+    </div>
+    <script src="../assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../assets/js/jszip.min.js"></script>
+    <script src="../assets/js/auth.min.js"></script>
+    <script src="../assets/js/settings-device.min.js"></script>
+    <script src="../assets/js/x-last.min.js"></script>
+</body>
+
+</html>

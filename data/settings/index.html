@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en" style="--bs-primary: #6710f5;--bs-primary-rgb: 103,16,245;">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>PandaGarage</title>
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="icon" type="image/svg+xml" sizes="167x150" href="../assets/img/icon.svg">
+    <link rel="stylesheet" href="../assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/css/styles.min.css">
+</head>
+
+<body style="background: #d6d6d6;">
+    <nav class="navbar navbar-expand-md bg-dark py-3" data-bs-theme="dark">
+        <div class="container"><a class="navbar-brand d-flex align-items-center" href="/"><img class="inverted-logo" src="../assets/img/icon.svg"><span style="padding-left: 10px;">PandaGarage</span></a><button data-bs-toggle="collapse" class="navbar-toggler" data-bs-target="#navcol-5"><span class="visually-hidden">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navcol-5">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/" i18n="nav-dashboard">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/info" i18n="nav-info">Info</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/logs" i18n="nav-logs">Logs</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/settings" i18n="nav-settings">Settings</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container" style="padding-top: 20px;">
+        <h3 style="margin-bottom: 15px;" i18n="title-settings">Settings</h3>
+        <div class="list-group"><a class="list-group-item list-group-item-action" style="margin-bottom: 10px;" href="/settings/device"><span i18n="nav-settings-device">Device</span></a><a class="list-group-item list-group-item-action" style="margin-bottom: 10px;" href="/settings/security"><span i18n="nav-settings-security">Security</span></a><a class="list-group-item list-group-item-action" style="margin-bottom: 10px;" href="/settings/wifi"><span i18n="nav-settings-wifi">WiFi</span></a><a class="list-group-item list-group-item-action" style="margin-bottom: 10px;" href="/settings/ha"><span i18n="nav-settings-ha">Home Assistant</span></a><a class="list-group-item list-group-item-action" style="margin-bottom: 10px;" href="/settings/update"><span i18n="nav-settings-update">Update</span></a><a class="list-group-item list-group-item-action list-group-item-warning" id="btn-restart" style="margin-bottom: 10px;background: var(--bs-warning);font-weight: bold;" href="#"><span i18n="nav-settings-restart">Restart</span></a><a class="list-group-item list-group-item-action list-group-item-danger text-white" id="btn-logout" style="margin-bottom: 10px;background: var(--bs-danger);font-weight: bold;" href="#"><span i18n="nav-settings-logout">Logout</span></a></div>
+    </div>
+    <script src="../assets/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../assets/js/auth.min.js"></script>
+    <script src="../assets/js/settings.min.js"></script>
+    <script src="../assets/js/x-last.min.js"></script>
+</body>
+
+</html>
