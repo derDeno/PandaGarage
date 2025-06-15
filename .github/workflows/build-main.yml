@@ -1,0 +1,38 @@
+name: Build Firmware
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+
+    - name: Install PlatformIO
+      run: pip install platformio
+
+    - name: Build firmware
+      run: pio run -e ESP32-S3
+
+    - name: Build filesystem
+      run: pio run -e ESP32-S3 -t buildfs
+
+    - name: Rename output files
+      run: |
+        mkdir output
+        cp .pio/build/*/firmware.bin output/firmware.bin
+        cp .pio/build/*/spiffs.bin output/filesystem.bin
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: built-binaries
+        path: output/
