@@ -1,5 +1,5 @@
 <div align="center">
-  <img width="200" src="https://derDeno.github.io/PandaGarage/img/logo.png" />
+  <img width="150" src="https://derDeno.github.io/PandaGarage/img/logo.png" />
 </div>
 
 # PandaGarage - A Hörmann Garage Door Controller
