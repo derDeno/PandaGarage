@@ -51,6 +51,7 @@ jobs:
       with:
         tag_name: ${{ env.VERSION }}
         name: Release ${{ env.VERSION }}
+        draft: true
         files: release/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
