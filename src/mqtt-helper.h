@@ -26,7 +26,7 @@ void mqttHaPublish(const char* topic, const char* payload, bool retain) {
 
 
 void mqttHaInitState() {
-    mqttHaPublish("/status", "online", false);
+    mqttHaPublish("/status", "online", true);
 
     mqttHaPublish("/temp/state", String(appConfig.temperature).c_str(), true);
     mqttHaPublish("/humidity/state", String(appConfig.humidity).c_str(), true);
@@ -205,15 +205,15 @@ void mqttHaConfig() {
 
 
     // publish
-    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/restart/config")).c_str(), restartConfig.c_str());
-    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/temp/config")).c_str(), tempConfig.c_str());
-    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/humidity/config")).c_str(), humidityConfig.c_str());
-    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/lux/config")).c_str(), luxConfig.c_str());
-    mqttClientHa.publish((String("homeassistant/light/") + appConfig.name + String("/light/config")).c_str(), lightConfig.c_str());
-    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/vent/config")).c_str(), ventConfig.c_str());
-    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/half/config")).c_str(), halfConfig.c_str());
-    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/toggle/config")).c_str(), toggleConfig.c_str());
-    mqttClientHa.publish((String("homeassistant/cover/") + appConfig.name + String("/cover/config")).c_str(), coverConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/restart/config")).c_str(), restartConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/temp/config")).c_str(), tempConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/humidity/config")).c_str(), humidityConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/lux/config")).c_str(), luxConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/light/") + appConfig.name + String("/light/config")).c_str(), lightConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/vent/config")).c_str(), ventConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/half/config")).c_str(), halfConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/toggle/config")).c_str(), toggleConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/cover/") + appConfig.name + String("/cover/config")).c_str(), coverConfig.c_str(), true);
 
     mqttHaInitState();
 }
@@ -317,7 +317,7 @@ int mqttHaReconnect() {
     int retries = 0;
     while (!mqttClientHa.connected() && retries < 5) {
 
-        if (mqttClientHa.connect(appConfig.name, appConfig.haUser, appConfig.haPwd, (String("pandagarage/") + appConfig.name + "/status").c_str(), 1, true, "offline")) {
+        if (mqttClientHa.connect(appConfig.name, appConfig.haUser, appConfig.haPwd, (String("pandagarage/") + appConfig.name + "/status").c_str(), 0, true, "offline")) {
             logger("connected to Home Assistant", "MQTT");
 
             // send config
@@ -374,6 +374,7 @@ void mqttHaLoop() {
 
     // send init mqtt state
     if (!mqttInitState) {
+        mqttHaPublish("/status", "online", true);
         mqttHaPublish("/cover/position", String(hoermannEngine->state->currentPosition).c_str(), true);
         mqttHaPublish("/cover/state", String(hoermannEngine->state->translatedState).c_str(), true);
         mqttHaPublish("/light/state", (hoermannEngine->state->lightOn ? "ON" : "OFF"), true);
