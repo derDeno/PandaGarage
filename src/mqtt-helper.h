@@ -6,12 +6,16 @@
 */
 #include <WiFiClient.h>
 
+
 extern AppConfig appConfig;
 
 WiFiClient wifiClientHa;
 PubSubClient mqttClientHa;
 bool configSent = false;
 bool mqttInitState = false;
+
+static const unsigned long GH_UPDATE_INTERVAL = 24UL * 60UL * 60UL * 1000UL;
+static unsigned long lastGhUpdateCheck = 0;
 
 
 void mqttHaPublish(const char* topic, const char* payload, bool retain) {
@@ -31,6 +35,7 @@ void mqttHaInitState() {
     mqttHaPublish("/temp/state", String(appConfig.temperature).c_str(), true);
     mqttHaPublish("/humidity/state", String(appConfig.humidity).c_str(), true);
     mqttHaPublish("/lux/state", String(appConfig.lux).c_str(), true);
+    mqttHaPublish("/update/state", "OFF", true);
     mqttHaPublish("/light/state", "OFF", true);
     mqttHaPublish("/cover/state", "closed", true);
     mqttHaPublish("/cover/position", "0", true);
@@ -74,7 +79,7 @@ void mqttHaConfig() {
     // temp sensor
     // topic: homeassistant/sensor/pandagarage/temp/config
     JsonDocument tempSensor;
-    tempSensor["name"] = "Garage Temperature";
+    tempSensor["name"] = "Temperature";
     tempSensor["uniq_id"] = appConfig.name + String("_temp");
     tempSensor["stat_t"] = mqttBase + "/temp/state";
     tempSensor["avty_t"] = availability_topic;
@@ -85,7 +90,7 @@ void mqttHaConfig() {
     // humidity sensor
     // topic: homeassistant/sensor/pandagarage/humidity/config
     JsonDocument humiditySensor;
-    humiditySensor["name"] = "Garage Humidity";
+    humiditySensor["name"] = "Humidity";
     humiditySensor["uniq_id"] = appConfig.name + String("_humidity");
     humiditySensor["stat_t"] = mqttBase + "/humidity/state";
     humiditySensor["avty_t"] = availability_topic;
@@ -96,29 +101,33 @@ void mqttHaConfig() {
     // lux sensor
     // topic: homeassistant/sensor/pandagarage/lux/config
     JsonDocument luxSensor;
-    luxSensor["name"] = "Garage Lux";
+    luxSensor["name"] = "Lux";
     luxSensor["uniq_id"] = appConfig.name + String("_lux");
     luxSensor["stat_t"] = mqttBase + "/lux/state";
     luxSensor["avty_t"] = availability_topic;
     luxSensor["unit_of_meas"] = "lx";
+    luxSensor["icon"] = "mdi:brightness-5";
     luxSensor["dev_cla"] = "illuminance";
     luxSensor["dev"] = device;
 
     // update sensor
     // topic: homeassistant/sensor/pandagarage/update/config
     JsonDocument updateSensor;
-    luxSensor["name"] = "Update Available";
-    luxSensor["uniq_id"] = appConfig.name + String("_update");
-    luxSensor["stat_t"] = mqttBase + "/update/state";
-    luxSensor["avty_t"] = availability_topic;
-    luxSensor["dev_cla"] = "enum";
-    luxSensor["dev"] = device;
+    updateSensor["name"] = "Firmware Update";
+    updateSensor["uniq_id"] = appConfig.name + String("_update");
+    updateSensor["stat_t"] = mqttBase + "/update/state";
+    updateSensor["avty_t"] = availability_topic;
+    updateSensor["icon"] = "mdi:cloud-download";
+    updateSensor["payload_on"] = "ON";
+    updateSensor["payload_off"] = "OFF";
+    updateSensor["dev_cla"] = "update";
+    updateSensor["dev"] = device;
     
 
     // light
     // topic: homeassistant/light/pandagarage/light/config
     JsonDocument light;
-    light["name"] = "Garage Door Light";
+    light["name"] = "Light";
     light["uniq_id"] = appConfig.name + String("_light");
     light["stat_t"] = mqttBase + "/light/state";
     light["cmd_t"] = mqttBase + "/light/switch";
@@ -126,8 +135,7 @@ void mqttHaConfig() {
     light["payload_on"] = "ON";
     light["payload_off"] = "OFF";
     light["state_on"] = "ON";
-    light["state_off"] = "OFF";    
-    light["retain"] = false;
+    light["state_off"] = "OFF";
     light["brightness"] = false;
     light["dev_cla"] = "light";
     light["dev"] = device;
@@ -166,7 +174,7 @@ void mqttHaConfig() {
     // cover
     // topic: homeassistant/cover/pandagarage/cover/config
     JsonDocument cover;
-    cover["name"] = "Garage Door";
+    cover["name"] = "Door";
     cover["uniq_id"] = appConfig.name + String("_cover");
     cover["avty_t"] = availability_topic;
     cover["stat_t"] = mqttBase + "/cover/state";
@@ -192,11 +200,12 @@ void mqttHaConfig() {
 
     
     // serialize
-    String restartConfig, tempConfig, humidityConfig, luxConfig, lightConfig, ventConfig, halfConfig, toggleConfig, coverConfig;
+    String restartConfig, tempConfig, humidityConfig, luxConfig, updateConfig, lightConfig, ventConfig, halfConfig, toggleConfig, coverConfig;
     serializeJson(restart, restartConfig);
     serializeJson(tempSensor, tempConfig);
     serializeJson(humiditySensor, humidityConfig);
     serializeJson(luxSensor, luxConfig);
+    serializeJson(updateSensor, updateConfig);
     serializeJson(light, lightConfig);
     serializeJson(vent, ventConfig);
     serializeJson(half, halfConfig);
@@ -209,6 +218,7 @@ void mqttHaConfig() {
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/temp/config")).c_str(), tempConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/humidity/config")).c_str(), humidityConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/lux/config")).c_str(), luxConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/update/config")).c_str(), updateConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/light/") + appConfig.name + String("/light/config")).c_str(), lightConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/vent/config")).c_str(), ventConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/half/config")).c_str(), halfConfig.c_str(), true);
@@ -379,6 +389,17 @@ void mqttHaLoop() {
         mqttHaPublish("/cover/state", String(hoermannEngine->state->translatedState).c_str(), true);
         mqttHaPublish("/light/state", (hoermannEngine->state->lightOn ? "ON" : "OFF"), true);
         mqttInitState = true;
+    }
+
+    // check if firmware update is available - only run once a day
+    if (millis() - lastGhUpdateCheck >= GH_UPDATE_INTERVAL) {
+        lastGhUpdateCheck = millis();
+
+        if (checkForFirmwareUpdate()) {
+            mqttHaPublish("/update/state", "ON", true);
+        } else {
+            mqttHaPublish("/update/state", "OFF", true);
+        }
     }
 
     mqttClientHa.loop();

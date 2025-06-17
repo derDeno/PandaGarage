@@ -21,7 +21,6 @@ Preferences pref;
 AsyncWebServer server(80);
 AsyncEventSource events("/api/events");
 
-
 void initConfig() {
     
   // FS Version
