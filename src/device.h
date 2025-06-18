@@ -1,8 +1,6 @@
 #include <HDC1080JS.h>
 #include <BH1750.h>
 #include "Wire.h"
-#include <WiFiClientSecure.h>
-#include <HTTPClient.h>
 
 // external sensors
 #include <Adafruit_AHTX0.h>
@@ -282,33 +280,3 @@ void sensorLoop() {
     }
 }
 
-bool checkForFirmwareUpdate() {
-    WiFiClientSecure client;
-    client.setInsecure();
-
-    String url = "https://api.github.com/repos/derDeno/PandaGarage/releases/latest";
-
-    HTTPClient https;
-    https.begin(client, url);
-    https.addHeader("User-Agent", "PandaGarage");
-
-    int httpCode = https.GET();
-    if (httpCode == HTTP_CODE_OK) {
-        String payload = https.getString();
-        https.end();
-
-        JsonDocument doc;
-        auto err = deserializeJson(doc, payload);
-        if (err) {
-            Serial.printf("JSON parse failed: %s\n", err.c_str());
-            return false;
-        }
-
-        const char* latestTag = doc["tag_name"];
-        return (strcmp(latestTag, VERSION) != 0);
-
-    } else {
-        https.end();
-        return false;
-    }
-}

@@ -3,7 +3,7 @@
 */
 
 // System values
-#define VERSION "0.1.58"
+#define VERSION "0.1.59"
 #define RS_TXD 17
 #define RS_RXD 18
 #define RS_EN 16
@@ -40,6 +40,7 @@ struct AppConfig {
     char versionFs[13];         // version of the filesystem
     String serialNumber;        // serial number
     String hwRev;               // hardware revision
+    char latestFw[64];          // latest firmware version
 
 
     // device config
