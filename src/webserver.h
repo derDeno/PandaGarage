@@ -7,6 +7,11 @@ extern AsyncEventSource events;
 extern Preferences pref;
 extern AppConfig appConfig;
 
+bool updateInProgress = false;
+volatile int lastReportedPct = 0;
+volatile int currentPct = 0;
+
+
 // Auth Middleware
 bool isAuthorized(AsyncWebServerRequest* request) {
     if(!appConfig.useAuth) {
@@ -173,7 +178,13 @@ void handleOtaFw(AsyncWebServerRequest *request, const String &filename, size_t 
 
     if (!Update.hasError() && len > 0) {
         if (Update.write(data, len) != len) {
-            Update.printError(Serial);
+            String errMsg;
+            StringPrinter sp(errMsg);
+
+            Update.printError(sp);
+            logger(errMsg, "E");
+            events.send(errMsg, "ota-progress", millis());
+
             vTaskResume(modBusTask);
 
         } else {
@@ -181,6 +192,10 @@ void handleOtaFw(AsyncWebServerRequest *request, const String &filename, size_t 
             int progress = (totalSize * 100) / request->contentLength();
             Serial.println("OTA Firmware progress: " + String(progress) + "%");
             events.send(String(progress).c_str(), "ota-progress", millis());
+
+            // if mqtt is connected, publish progress
+            updateInProgress = true;
+            currentPct = progress;
         }
     }
 
@@ -191,8 +206,12 @@ void handleOtaFw(AsyncWebServerRequest *request, const String &filename, size_t 
             events.send("100", "ota-progress", millis());
 
         } else {
-            Update.printError(Serial);
-            events.send("error", "ota-progress", millis());
+            String errMsg;
+            StringPrinter sp(errMsg);
+            
+            Update.printError(sp);
+            logger(errMsg, "E");
+            events.send(errMsg, "ota-progress", millis());
         }
         
         vTaskResume(modBusTask);

@@ -21,6 +21,7 @@ Preferences pref;
 AsyncWebServer server(80);
 AsyncEventSource events("/api/events");
 
+
 void initConfig() {
     
   // FS Version
@@ -201,7 +202,7 @@ void setup() {
 void loop() {
 
   // was setup done?
-  if (appConfig.setupDone) {
+  if (appConfig.setupDone && !updateInProgress) {
     
     // check for garage door updates
     if (hoermannEngine->state->isValid() && hoermannEngine->state->changed) {
@@ -213,6 +214,23 @@ void loop() {
     mqttHaLoop();
     sensorLoop();
     buzzerLoop();
+  }
+
+  // if update is in progress sent mqtt update
+  if (updateInProgress && appConfig.haSet && lastReportedPct != currentPct) {
+
+    JsonDocument doc;
+    doc["installed_version"] = VERSION;
+    doc["latest_version"] = appConfig.latestFw;
+    doc["entity_picture"] = "https://raw.githubusercontent.com/derDeno/PandaGarage/refs/heads/gh-pages/img/logo.png";
+    doc["release_url"] = "https://github.com/derDeno/PandaGarage/releases/latest";
+    doc["update_percentage"] = currentPct;
+
+    String state;
+    serializeJson(doc, state);
+    mqttHaPublish("/update/state", state.c_str(), true);
+
+    lastReportedPct = currentPct;
   }
 
   // these are always running

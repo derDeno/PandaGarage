@@ -167,3 +167,15 @@ void deleteLogFile(const char* fileName) {
         LittleFS.remove(fileName);
     }
 }
+
+
+class StringPrinter : public Print {
+    String &out;
+
+public:
+    StringPrinter(String &s) : out(s) {}
+    size_t write(uint8_t c) override {
+        out += (char)c;
+        return 1;
+    }
+};

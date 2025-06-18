@@ -5,6 +5,8 @@
 * Managig MQTT communication with Home Assistant
 */
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 
 
 extern AppConfig appConfig;
@@ -35,10 +37,17 @@ void mqttHaInitState() {
     mqttHaPublish("/temp/state", String(appConfig.temperature).c_str(), true);
     mqttHaPublish("/humidity/state", String(appConfig.humidity).c_str(), true);
     mqttHaPublish("/lux/state", String(appConfig.lux).c_str(), true);
-    mqttHaPublish("/update/state", "OFF", true);
     mqttHaPublish("/light/state", "OFF", true);
     mqttHaPublish("/cover/state", "closed", true);
     mqttHaPublish("/cover/position", "0", true);
+
+    JsonDocument doc;
+    doc["installed_version"] = VERSION;
+    doc["update_percentage"] = nullptr;
+
+    String state;
+    serializeJson(doc, state);
+    mqttHaPublish("/update/state", state.c_str(), true);
 
     delay(250);
 }
@@ -111,16 +120,18 @@ void mqttHaConfig() {
     luxSensor["dev"] = device;
 
     // update sensor
-    // topic: homeassistant/sensor/pandagarage/update/config
+    // topic: homeassistant/update/pandagarage/config
     JsonDocument updateSensor;
     updateSensor["name"] = "Firmware Update";
+    updateSensor["title"] = appConfig.name + String(" Firmware");
+    updateSensor["platform"] = "update";
+    updateSensor["release_url"] = "https://github.com/derDeno/PandaGarage/releases/latest";
     updateSensor["uniq_id"] = appConfig.name + String("_update");
     updateSensor["stat_t"] = mqttBase + "/update/state";
     updateSensor["avty_t"] = availability_topic;
     updateSensor["icon"] = "mdi:cloud-download";
-    updateSensor["payload_on"] = "ON";
-    updateSensor["payload_off"] = "OFF";
-    updateSensor["dev_cla"] = "update";
+    updateSensor["ent_cat"] = "config";
+    updateSensor["dev_cla"] = "firmware";
     updateSensor["dev"] = device;
     
 
@@ -218,7 +229,7 @@ void mqttHaConfig() {
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/temp/config")).c_str(), tempConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/humidity/config")).c_str(), humidityConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/lux/config")).c_str(), luxConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/update/config")).c_str(), updateConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/update/") + appConfig.name + String("/config")).c_str(), updateConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/light/") + appConfig.name + String("/light/config")).c_str(), lightConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/vent/config")).c_str(), ventConfig.c_str(), true);
     mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/half/config")).c_str(), halfConfig.c_str(), true);
@@ -372,6 +383,48 @@ bool mqttHaSetup() {
 }
 
 
+void checkForFirmwareUpdate() {
+    WiFiClientSecure client;
+    client.setInsecure();
+
+    String url = "https://api.github.com/repos/derDeno/PandaGarage/releases/latest";
+
+    HTTPClient https;
+    https.begin(client, url);
+    https.addHeader("User-Agent", "PandaGarage");
+
+    int httpCode = https.GET();
+    if (httpCode == HTTP_CODE_OK) {
+        String payload = https.getString();
+        https.end();
+
+        JsonDocument res;
+        auto err = deserializeJson(res, payload);
+        if (err) {
+            Serial.printf("JSON parse failed: %s\n", err.c_str());
+            return;
+        }
+
+        const char* latestTag = res["tag_name"];
+        strcpy(appConfig.latestFw, latestTag);
+
+        JsonDocument doc;
+        doc["installed_version"] = VERSION;
+        doc["latest_version"] = latestTag;
+        doc["entity_picture"] = "https://raw.githubusercontent.com/derDeno/PandaGarage/refs/heads/gh-pages/img/logo.png";
+        doc["release_url"] = "https://github.com/derDeno/PandaGarage/releases/latest";
+        doc["update_percentage"] = nullptr;
+
+        String state;
+        serializeJson(doc, state);
+        mqttHaPublish("/update/state", state.c_str(), true);
+
+    } else {
+        https.end();
+        return;
+    }
+}
+
 void mqttHaLoop() {
 
     if(!appConfig.haSet) {
@@ -388,18 +441,15 @@ void mqttHaLoop() {
         mqttHaPublish("/cover/position", String(hoermannEngine->state->currentPosition).c_str(), true);
         mqttHaPublish("/cover/state", String(hoermannEngine->state->translatedState).c_str(), true);
         mqttHaPublish("/light/state", (hoermannEngine->state->lightOn ? "ON" : "OFF"), true);
+
+        checkForFirmwareUpdate();
         mqttInitState = true;
     }
 
     // check if firmware update is available - only run once a day
     if (millis() - lastGhUpdateCheck >= GH_UPDATE_INTERVAL) {
         lastGhUpdateCheck = millis();
-
-        if (checkForFirmwareUpdate()) {
-            mqttHaPublish("/update/state", "ON", true);
-        } else {
-            mqttHaPublish("/update/state", "OFF", true);
-        }
+        checkForFirmwareUpdate();
     }
 
     mqttClientHa.loop();
