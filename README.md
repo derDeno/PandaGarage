@@ -4,11 +4,10 @@
 
 # PandaGarage - A Hörmann Garage Door Controller
 
-![GitHub Release](https://img.shields.io/github/v/release/derDeno/PandaGarage?style=for-the-badge&label=PandaGarage&color=blueviolet)
-
-![Build](https://img.shields.io/github/actions/workflow/status/derDeno/PandaGarage/build.yml?branch=main&label=Build%20Status)
-[![license](https://img.shields.io/badge/license-CC--BY--NC--SA--4.0-blue)](https://github.com/derDeno/PandaGarage/blob/HEAD/LICENSE)
-![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/derDeno/PandaGarage)
+![GitHub Release](https://img.shields.io/github/v/release/derDeno/PandaGarage?display_name=release&style=for-the-badge&color=blueviolet)
+![Build](https://img.shields.io/github/actions/workflow/status/derDeno/PandaGarage/build.yml?branch=main&label=Build%20Status&style=for-the-badge)
+[![license](https://img.shields.io/badge/license-CC--BY--NC--SA--4.0-blue?style=for-the-badge)](https://github.com/derDeno/PandaGarage/blob/HEAD/LICENSE)
+![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/derDeno/PandaGarage?style=for-the-badge)
 
 
 Key Features of the PandaGarage Controller:
