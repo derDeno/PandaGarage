@@ -19,6 +19,8 @@ extern AppConfig appConfig;
 
 TaskHandle_t modBusTask;
 void modbusServeTask(void *parameter);
+void retryTimerCallback(TimerHandle_t xTimer);
+
 
 class HoermannCommand {
    public:
@@ -78,8 +80,8 @@ class HoermannState {
     bool lightOn = false;
 
     State state = CLOSED;
-    String translatedState = "closed";
-    String coverState = "closed";
+    String translatedState = "not connected";
+    String coverState = "not connected";
     String debugMessage = "initial";
 
     unsigned long lastModbusRespone = 0;
@@ -213,6 +215,14 @@ class HoermannGarageEngine {
     HoermannState *state = new HoermannState();
     HoermannGarageEngine() {};
 
+    TimerHandle_t retryTimer = nullptr;
+    const HoermannCommand* lastRetryCommand = nullptr;
+    HoermannState::State stateBeforeCommand;
+    int retryCount = 0;
+    static constexpr int MAX_RETRIES = 2;
+    static constexpr int RETRY_DELAY_MS = 1000;
+
+
     void setup() {
 
         esp_task_wdt_init(10, false);
@@ -235,6 +245,14 @@ class HoermannGarageEngine {
         );     
         
         esp_task_wdt_add(modBusTask);
+
+        retryTimer = xTimerCreate(
+            "RetryTimer",
+            pdMS_TO_TICKS(RETRY_DELAY_MS),
+            pdFALSE,
+            nullptr,
+            retryTimerCallback
+        );
 
         // Required for Write
         mb.addHreg(0x9C41, 0, 0x03);  // Commands
@@ -305,7 +323,7 @@ class HoermannGarageEngine {
             mb.Reg(HREG(0x9CB9 + 3), (uint16_t)0x10ff);
             mb.Reg(HREG(0x9CB9 + 4), (uint16_t)0xa845);
         } else if (fc == Modbus::FC_WRITE_REGS && data.reg.address == 0x9D31) {
-            // ESP_LOGD("ON_REQ", "on Status Update (cnt: %d)",data.regCount);
+            //logger("on Status Update cnt: " + data.regCount, "HCP");
         } else {
             this->state->debugMessage = "unknown function code fc=" + fc;
             this->state->debMessage = true;
@@ -455,40 +473,52 @@ class HoermannGarageEngine {
         }
     }
 
+
     /**
      * Control Functions
      */
     void stopDoor() {
-        setCommand(this->state->state == HoermannState::State::CLOSING || this->state->state == HoermannState::State::OPENING, &HoermannCommand::STARTSTOPDOOR);
+        //setCommand(this->state->state == HoermannState::State::CLOSING || this->state->state == HoermannState::State::OPENING, &HoermannCommand::STARTSTOPDOOR);
+        sendCommandWithRetry(this->state->state == HoermannState::State::CLOSING || this->state->state == HoermannState::State::OPENING, &HoermannCommand::STARTSTOPDOOR);
     }
 
     void closeDoor() {
-        setCommand(true, &HoermannCommand::STARTCLOSEDOOR);
+        //setCommand(true, &HoermannCommand::STARTCLOSEDOOR);
+        sendCommandWithRetry(true, &HoermannCommand::STARTCLOSEDOOR);
+
     }
 
     void openDoor() {
-        setCommand(true, &HoermannCommand::STARTOPENDOOR);
+        //setCommand(true, &HoermannCommand::STARTOPENDOOR);
+        sendCommandWithRetry(true, &HoermannCommand::STARTOPENDOOR);
     }
 
     void toggleDoor() {
-        setCommand(this->state->currentPosition < 1, &HoermannCommand::STARTOPENDOOR);
-        setCommand(this->state->currentPosition >= 1, &HoermannCommand::STARTCLOSEDOOR);
+        //setCommand(this->state->currentPosition < 1, &HoermannCommand::STARTOPENDOOR);
+        //setCommand(this->state->currentPosition >= 1, &HoermannCommand::STARTCLOSEDOOR);
+
+        sendCommandWithRetry(this->state->currentPosition < 1, &HoermannCommand::STARTOPENDOOR);
+        sendCommandWithRetry(this->state->currentPosition >= 1, &HoermannCommand::STARTCLOSEDOOR);
     }
 
     void halfPositionDoor() {
-        setCommand(true, &HoermannCommand::STARTOPENDOORHALF);
+        //setCommand(true, &HoermannCommand::STARTOPENDOORHALF);
+        sendCommandWithRetry(true, &HoermannCommand::STARTOPENDOORHALF);
     }
 
     void ventilationPositionDoor() {
-        setCommand(true, &HoermannCommand::STARTVENTPOSITION);
+        //setCommand(true, &HoermannCommand::STARTVENTPOSITION);
+        sendCommandWithRetry(true, &HoermannCommand::STARTVENTPOSITION);
     }
 
     void turnLight(bool on) {
-        setCommand((on && !this->state->lightOn) || (!on && this->state->lightOn), &HoermannCommand::STARTTOGGLELAMP);
+        //setCommand((on && !this->state->lightOn) || (!on && this->state->lightOn), &HoermannCommand::STARTTOGGLELAMP);
+        sendCommandWithRetry((on && !this->state->lightOn) || (!on && this->state->lightOn), &HoermannCommand::STARTTOGGLELAMP);
     }
 
     void toggleLight() {
-        setCommand(true, &HoermannCommand::STARTTOGGLELAMP);
+        //setCommand(true, &HoermannCommand::STARTTOGGLELAMP);
+        sendCommandWithRetry(true, &HoermannCommand::STARTTOGGLELAMP);
     }
 
     void setPosition(int setPosition) {
@@ -499,16 +529,36 @@ class HoermannGarageEngine {
             openDoor();
         else if ((setPosition > 5) && (setPosition < 95)) {
             this->state->setGotoPosition(static_cast<float>(setPosition) / 100.0f);
-            setCommand(this->state->currentPosition < this->state->gotoPosition, &HoermannCommand::STARTOPENDOOR);
-            setCommand(this->state->currentPosition > this->state->gotoPosition, &HoermannCommand::STARTCLOSEDOOR);
+            //setCommand(this->state->currentPosition < this->state->gotoPosition, &HoermannCommand::STARTOPENDOOR);
+            //setCommand(this->state->currentPosition > this->state->gotoPosition, &HoermannCommand::STARTCLOSEDOOR);
+
+            sendCommandWithRetry(this->state->currentPosition < this->state->gotoPosition, &HoermannCommand::STARTOPENDOOR);
+            sendCommandWithRetry(this->state->currentPosition > this->state->gotoPosition, &HoermannCommand::STARTCLOSEDOOR);
         }
     }
+
 
    private:
     ModbusRTU mb;                                  // ModbusRTU instance, the man behind the curtain
     const HoermannCommand *nextCommand = nullptr;  // Next Command to transmit
     unsigned long commandWrittenOn = 0;            // When was last command written (wait 100ms before end of command is transmitted)
     QueueHandle_t commandQueue = NULL;             // Queue for pending commands
+
+    /**
+     * Send Command with Retry Logic
+     * This function sends a command and starts a retry timer if the command is not successful
+     * It will retry the command up to MAX_RETRIES times with a delay of RETRY_DELAY_MS between retries
+     */
+    void sendCommandWithRetry(bool cond, const HoermannCommand* cmd) {
+        if(cond) {
+            this->stateBeforeCommand = this->state->state;
+            this->lastRetryCommand = cmd;
+            this->retryCount = 0;
+
+            setCommand(true, cmd);
+            xTimerStart(this->retryTimer, 0);
+        }
+    }
 
 };
 
@@ -530,4 +580,29 @@ void modbusServeTask(void *parameter) {
         vTaskDelay(pdMS_TO_TICKS(1));
     }
     vTaskDelete(NULL);
+}
+
+/**
+ * Callback for the retry timer
+ * This function checks if the state has changed since the last command was sent
+ * If not, it retries the command up to MAX_RETRIES times
+ */
+void retryTimerCallback(TimerHandle_t xTimer) {
+    if (!hoermannEngine) return;
+
+    auto* engine = hoermannEngine;
+
+    HoermannState::State currentState = engine->state->state;
+
+    if (currentState == engine->stateBeforeCommand && engine->retryCount < HoermannGarageEngine::MAX_RETRIES) {
+        engine->retryCount++;
+        logger("Retrying command (attempt " + String(engine->retryCount) + ")", "HCP");
+
+        engine->setCommand(true, engine->lastRetryCommand);
+        xTimerStart(engine->retryTimer, 0);
+    } else {
+        logger("Retry done or state changed", "HCP");
+        engine->retryCount = 0;
+        engine->lastRetryCommand = nullptr;
+    }
 }
