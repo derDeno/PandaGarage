@@ -7,6 +7,7 @@
 #include <SensirionI2cScd4x.h>
 #include <ccs811.h>
 
+#define BH1750_I2CADDR 0x23
 #define BUZZER_CHANNEL 0  // LEDC channel (0–15)
 #define BUZZER_FREQ 4000  // Frequency in Hz (2kHz tone)
 #define BUZZER_RES 8      // Resolution in bits (8 bits = 0–255)
@@ -21,6 +22,7 @@ CCS811 ccs811;
 
 unsigned long lastSensorReadTime = 0;
 unsigned long lastBuzzerTime = 0;
+bool isSensorFirstRun = true;
 unsigned long tuneDuration(int tune) {
     if (tune == 1) {
         return 600;
@@ -122,7 +124,7 @@ void setupSensors() {
     hdc = HDC1080JS();
     hdc.config();
 
-    lightMeter.begin();
+    lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, BH1750_I2CADDR, &Wire);
 
     if (appConfig.externalSensorSet) {
         if (appConfig.externalSensor == 1) {
@@ -156,7 +158,8 @@ void setupSensors() {
 void sensorLoop() {
     unsigned long currentTime = millis();
 
-    if (currentTime - lastSensorReadTime >= appConfig.sensorUpdateInterval) {
+    if (isSensorFirstRun || currentTime - lastSensorReadTime >= appConfig.sensorUpdateInterval) {
+        isSensorFirstRun = false;
         lastSensorReadTime = currentTime;
 
         // for temp get unit
@@ -170,8 +173,7 @@ void sensorLoop() {
             temp = (temp * 9.0 / 5.0) + 32.0;
         }
 
-        float lux = 0;
-        // float lux = lightMeter.readLightLevel();
+        float lux = lightMeter.readLightLevel();
 
         bool tempChanged = fabs(temp - appConfig.temperature) >= appConfig.tempThreshold;
         bool humidityChanged = fabs(humid - appConfig.humidity) >= appConfig.humThreshold;
