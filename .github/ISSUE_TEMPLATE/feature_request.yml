@@ -1,0 +1,43 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement.
+title: "[Feature] "
+labels: ["enhancement"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a new feature! Please describe it clearly.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature Description
+      description: Describe what you want to be added or changed.
+      placeholder: "I would like to have a dark mode switch in the settings..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Use Case / Motivation
+      description: Why do you need this feature? What problem does it solve?
+      placeholder: "Currently, users have to do X manually. This feature would automate that..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution (optional)
+      description: If you have a specific idea in mind for how to implement it, describe it here.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to make sure this feature hasn’t been requested yet.
+          required: true

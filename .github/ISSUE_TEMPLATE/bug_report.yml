@@ -1,0 +1,86 @@
+name: 🐞 Bug Report
+description: Report something that isn't working as expected.
+title: "[Bug] "
+labels: ["bug"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Please fill out all relevant fields to help us resolve the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clearly describe the bug and what you expected to happen.
+      placeholder: "When I click the button, nothing happens..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Describe how to reproduce the issue, step-by-step.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: input
+    id: version_fw
+    attributes:
+      label: Firmware Version
+      description: What version of the firmware are you using?
+      placeholder: e.g. v1.2.3
+    validations:
+      required: true
+
+  - type: input
+    id: version_fs
+    attributes:
+      label: Filesystem Version
+      description: What version of the filesystem are you using?
+      placeholder: e.g. v1.2.3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: origin
+    attributes:
+      label: Where did this happen?
+      description: Select where you encountered the issue.
+      options:
+        - Firmware bug
+        - WebUI bug
+        - Sensor bug
+        - Home Assistant / MQTT bug
+        - API bug
+        - Other / Don't know
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Output
+      description: Paste any error messages, logs, or console output.
+      render: shell
+      placeholder: |
+        [INFO] Starting...
+        [ERROR] Unexpected token...
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked that this issue has not already been reported.
+          required: true
+        - label: I have provided sufficient detail to reproduce the issue.
+          required: true

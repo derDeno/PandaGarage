@@ -1,0 +1,34 @@
+name: 🌍 New Translation Submission
+description: Submit a new or improved language file for PandaGarage
+labels: ["translation", "contribution"]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language Name
+      placeholder: e.g. German
+    validations:
+      required: true
+
+  - type: input
+    id: locale
+    attributes:
+      label: Locale Code
+      placeholder: e.g. de
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (optional)
+      placeholder: Any context or notes for this translation
+
+  - type: file
+    id: file
+    attributes:
+      label: Upload your translation file
+      description: Upload the `.json` file with translations
+      multiple: false
+    validations:
+      required: true

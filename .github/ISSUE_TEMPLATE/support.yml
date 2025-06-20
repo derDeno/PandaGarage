@@ -1,0 +1,20 @@
+name: 🤝 Support Request
+description: Ask a question or request guidance using the project.
+title: "[Support] "
+labels: ["question", "support"]
+assignees: []
+
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: What’s your question or issue?
+      placeholder: "I’m trying to connect to WebUI and not sure how to access it..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Background
+      description: Share any relevant context, logs, or links.
