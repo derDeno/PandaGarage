@@ -18,17 +18,13 @@ body:
     validations:
       required: true
 
+  - type: markdown
+    attributes:
+      value: |
+        Please attach your translation file (e.g. `de.json`) by dragging and dropping it into *Paste, drop, or click to add files* section below the Notes field.
+
   - type: textarea
     id: notes
     attributes:
       label: Notes (optional)
       placeholder: Any context or notes for this translation
-
-  - type: file
-    id: file
-    attributes:
-      label: Upload your translation file
-      description: Upload the `.json` file with translations
-      multiple: false
-    validations:
-      required: true
