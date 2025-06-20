@@ -504,10 +504,13 @@ void setupSettingsRoutes(AsyncWebServer &server) {
         if (request->hasParam("pwd", true)) {
             const String pwd = request->getParam("pwd", true)->value();
 
-            String output = sha256(pwd);
-            pref.putString("adminPwd", output);
+            // check if password is set
+            if (pwd.length() > 0) {
+                String output = sha256(pwd);
+                pref.putString("adminPwd", output);
 
-            logger("Admin password updated", "W");
+                logger("Admin password updated", "W");
+            }
         }
 
         if (request->hasParam("useAuth", true)) {

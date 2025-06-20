@@ -3,7 +3,7 @@
 */
 
 // System values
-#define VERSION "0.2.0"
+#define VERSION "0.2.1"
 #define RS_TXD 17
 #define RS_RXD 18
 #define RS_EN 16
