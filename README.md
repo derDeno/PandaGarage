@@ -1,5 +1,5 @@
 # IMPORTANT
-This branch is not deprecated, as hardware revision 1.0 is no longer used.
+This branch is has legacy code, as hardware revision 1.0 is no longer used.
 This branch is just for hw 1.0 users, to be able to reflash their boards.
 
 
