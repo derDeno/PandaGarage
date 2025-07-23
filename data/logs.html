@@ -36,7 +36,21 @@
             <div class="col text-end"><button class="btn btn-secondary" id="btn-log-debug-delete" type="button" style="margin-right: 10px;" i18n="btn-delete-log-debug">Delete Debug Log</button><a class="btn btn-primary" role="button" id="btn-log-debug-download" href="/api/log/debug" target="_blank" i18n="btn-download-log-debug">Download Debug Log</a></div>
         </div>
         <div class="card">
-            <div class="card-body"><code class="font-monospace" id="container-log-debug" style="color: rgb(79,79,79);">%LOG_DEBUG_TEMPLATE%</code></div>
+            <div class="card-body">
+                <div class="table-responsive" id="table-log" style="max-height: 70vh;">
+                    <table class="table">
+                        <thead>
+                            <tr class="top-0 z-2" style="position: sticky;">
+                                <th style="min-width: 180px;" i18n="text-timestamp">Timestamp</th>
+                                <th style="min-width: 100px;" i18n="text-log-level">Log Level</th>
+                                <th style="min-width: 80px;" i18n="text-tag">Tag</th>
+                                <th style="min-width: 500px;" i18n="text-message">Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-log-body"></tbody>
+                    </table>
+                </div><code class="font-monospace" id="no-log" style="color: rgb(79,79,79);" i18n="text-no-logs">No Logs found</code>
+            </div>
         </div>
     </div>
     <div class="container" style="margin-top: 20px;margin-bottom: 50px;">
@@ -44,7 +58,7 @@
             <div class="col text-end"><button class="btn btn-secondary" id="btn-log-access-delete" type="button" style="margin-right: 10px;" i18n="btn-delete-log-access">Delete Access Log</button><a class="btn btn-primary" role="button" id="btn-log-access-download" href="/api/log/access" target="_blank" i18n="btn-download-log-access">Download Access Log</a></div>
         </div>
         <div class="card">
-            <div class="card-body"><code class="font-monospace" id="container-log-access" style="color: rgb(79,79,79);">%LOG_ACCESS_TEMPLATE%</code></div>
+            <div class="card-body"><code class="font-monospace" id="container-log-access" style="color: rgb(79,79,79);">%LOG_ACCESS_TEMPLATE%</code><code class="font-monospace" id="no-log-access" style="color: rgb(79,79,79);" i18n="text-no-logs">No Logs found</code></div>
         </div>
     </div>
     <script src="assets/bootstrap/js/bootstrap.min.js"></script>
