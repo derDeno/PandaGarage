@@ -35,16 +35,16 @@ jobs:
         echo "Filesystem version: $FS_VERSION"
 
     - name: Build firmware
-      run: pio run -e ESP32-S3
+      run: pio run -e HW-2
 
     - name: Build filesystem
-      run: pio run -e ESP32-S3 -t buildfs
+      run: pio run -e HW-2 -t buildfs
 
     - name: Rename binaries with version
       run: |
         mkdir release
-        cp .pio/build/ESP32-S3/firmware.bin release/firmware-${VERSION}.bin
-        cp .pio/build/ESP32-S3/littlefs.bin release/filesystem-${FS_VERSION}.bin
+        cp .pio/build/HW-2/firmware.bin release/firmware-${VERSION}.bin
+        cp .pio/build/HW-2/littlefs.bin release/filesystem-${FS_VERSION}.bin
 
     - name: Create GitHub release
       uses: softprops/action-gh-release@v1
