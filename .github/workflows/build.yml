@@ -21,10 +21,10 @@ jobs:
       run: pip install platformio
 
     - name: Build firmware
-      run: pio run -e ESP32-S3
+      run: pio run -e HW-2
 
     - name: Build filesystem
-      run: pio run -e ESP32-S3 -t buildfs
+      run: pio run -e HW-2 -t buildfs
 
     - name: Rename output files
       run: |
