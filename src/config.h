@@ -11,7 +11,7 @@
 #define I2C_SCL 12
 #define BUZZER_PIN 3
 #define BTN_PIN 0
-#define DEBUG true // set this to true if you want serial output. false to reduce load in production
+#define DEBUG false // set this to true if you want serial output. false to reduce load in production
 
 // Default Pref values
 #define PREF_TEMP_UNIT 0 // 0 = Celsius, 1 = Fahrenheit
