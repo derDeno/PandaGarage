@@ -50,7 +50,7 @@
                         <div class="row" style="margin-bottom: 20px;">
                             <div class="col-3 text-start"><button class="btn btn-success btn-lg" id="btn-door-up" type="button" style="width: 100%;" _i18n="btn-up"><span style="transform: rotate(270deg);display: inline-block;">➜</span></button></div>
                             <div class="col text-center align-self-center">
-                                <div class="form-check form-switch form-check-inline text-start"><input class="form-check-input" type="checkbox" id="switch-light" style="height: 24px;width: 48px;"><label class="form-check-label fs-5" for="switch-light" i18n="btn-light" style="padding-left: 10px;">Light</label></div>
+                                <div class="form-check form-switch form-check-inline text-start"><input class="form-check-input" type="checkbox" id="switch-light" style="height: 24px;width: 48px;"><label class="form-check-label fs-5" for="switch-light" i18n="title-light" style="padding-left: 10px;">Light</label></div>
                             </div>
                         </div>
                         <div class="row" style="margin-bottom: 20px;">
@@ -72,12 +72,12 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title" i18n="title-temp">Temperature</h5>
-                        <div class="row row-cols-2">
+                        <div class="row g-0 row-cols-2">
                             <div class="col-auto align-self-end">
-                                <h1 class="text-end" id="dash-temp">-</h1>
+                                <h1 id="dash-temp">-</h1>
                             </div>
                             <div class="col-auto align-self-start">
-                                <h3 class="text-start">°C</h3>
+                                <h3>°C</h3>
                             </div>
                         </div>
                     </div>
@@ -87,12 +87,27 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title" i18n="title-humidity">Humidity</h5>
-                        <div class="row row-cols-2">
+                        <div class="row g-0 row-cols-2">
                             <div class="col-auto align-self-end">
                                 <h1 class="text-end" id="dash-hum">-</h1>
                             </div>
                             <div class="col-auto align-self-start">
-                                <h3 class="text-start">%</h3>
+                                <h3>%</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col" style="margin-bottom: 15px;">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title" i18n="title-pressure">Pressure</h5>
+                        <div class="row g-0 row-cols-2">
+                            <div class="col-auto align-self-end">
+                                <h1 class="text-end" id="dash-pres">-</h1>
+                            </div>
+                            <div class="col-auto align-self-start">
+                                <h3>hPa</h3>
                             </div>
                         </div>
                     </div>
@@ -102,27 +117,12 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title" i18n="title-light">Light</h5>
-                        <div class="row row-cols-2">
+                        <div class="row g-0 row-cols-2">
                             <div class="col-auto align-self-end">
                                 <h1 class="text-end" id="dash-lux">-</h1>
                             </div>
                             <div class="col-auto align-self-start">
-                                <h3 class="text-start">lux</h3>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col" id="dash-ext-card" style="margin-bottom: 15px;">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title" id="dash-ext-title">-</h5>
-                        <div class="row row-cols-2">
-                            <div class="col-auto align-self-end">
-                                <h1 class="text-end" id="dash-ext-val">-</h1>
-                            </div>
-                            <div class="col-auto align-self-start">
-                                <h3 class="text-start" id="dash-ext-unit">-</h3>
+                                <h3>lux</h3>
                             </div>
                         </div>
                     </div>

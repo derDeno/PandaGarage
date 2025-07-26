@@ -1,33 +1,108 @@
-#ifndef MQTT_HA_H
-#define MQTT_HA_H
-
 /*
 * Managig MQTT communication with Home Assistant
 */
-#include <WiFiClient.h>
+#include <AsyncMqttClient.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
+#define MQTT_TOPIC_LEN 128
+#define MQTT_PAYLOAD_LEN 256
 
 extern AppConfig appConfig;
 
-WiFiClient wifiClientHa;
-PubSubClient mqttClientHa;
+AsyncMqttClient mqttClientHa;
 bool configSent = false;
 bool mqttInitState = false;
 
 static const unsigned long GH_UPDATE_INTERVAL = 24UL * 60UL * 60UL * 1000UL;
 static unsigned long lastGhUpdateCheck = 0;
 
+struct MqttMessage {
+    char topic[MQTT_TOPIC_LEN];
+    char payload[MQTT_PAYLOAD_LEN];
+    bool retain;
+};
+
+QueueHandle_t mqttQueue = NULL;
+TaskHandle_t mqttTaskHandle = NULL;
+void mqttTask(void *parameter);
+void initMqttTask();
+void onMqttConnect(bool sessionPresent);
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason);
+void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
+
+
+void checkForFirmwareUpdate() {
+    WiFiClientSecure client;
+    client.setInsecure();
+
+    String url = "https://api.github.com/repos/derDeno/PandaGarage/releases/latest";
+
+    HTTPClient https;
+    https.begin(client, url);
+    https.addHeader("User-Agent", "PandaGarage");
+
+    int httpCode = https.GET();
+    if (httpCode == HTTP_CODE_OK) {
+        String payload = https.getString();
+        https.end();
+
+        JsonDocument res;
+        auto err = deserializeJson(res, payload);
+        if (err) {
+            Serial.printf("JSON parse failed: %s\n", err.c_str());
+            return;
+        }
+
+        const char* latestTag = res["tag_name"];
+        strcpy(appConfig.latestFw, latestTag);
+
+        JsonDocument doc;
+        doc["installed_version"] = VERSION;
+        doc["latest_version"] = latestTag;
+        doc["entity_picture"] = "https://raw.githubusercontent.com/derDeno/PandaGarage/refs/heads/gh-pages/img/logo.png";
+        doc["release_url"] = "https://github.com/derDeno/PandaGarage/releases/latest";
+        doc["update_percentage"] = nullptr;
+
+        String state;
+        serializeJson(doc, state);
+        mqttHaPublish("/update/state", state.c_str(), true);
+
+    } else {
+        https.end();
+        return;
+    }
+}
+
 
 void mqttHaPublish(const char* topic, const char* payload, bool retain) {
 
-    if(!appConfig.haSet || !mqttClientHa.connected()) {
+    if(!appConfig.haSet) {
         return;
     }
-    
+
     const String mqttBase = String("pandagarage/") + appConfig.name;
-    mqttClientHa.publish((mqttBase + topic).c_str(), payload, retain);
+    String fullTopic = mqttBase + topic;
+
+    // if called from MQTT task directly publish
+    if (mqttTaskHandle != NULL && xTaskGetCurrentTaskHandle() == mqttTaskHandle) {
+        if (mqttClientHa.connected()) {
+            mqttClientHa.publish(fullTopic.c_str(), 0, retain, payload);
+        }
+        return;
+    }
+
+    if (mqttQueue != NULL) {
+        MqttMessage msg;
+        strncpy(msg.topic, fullTopic.c_str(), MQTT_TOPIC_LEN - 1);
+        msg.topic[MQTT_TOPIC_LEN - 1] = '\0';
+        strncpy(msg.payload, payload, MQTT_PAYLOAD_LEN - 1);
+        msg.payload[MQTT_PAYLOAD_LEN - 1] = '\0';
+        msg.retain = retain;
+        xQueueSend(mqttQueue, &msg, 0);
+    }
 }
 
 
@@ -36,6 +111,7 @@ void mqttHaInitState() {
 
     mqttHaPublish("/temp/state", String(appConfig.temperature).c_str(), true);
     mqttHaPublish("/humidity/state", String(appConfig.humidity).c_str(), true);
+    mqttHaPublish("/pressure/state", String(appConfig.pressure).c_str(), true);
     mqttHaPublish("/lux/state", String(appConfig.lux).c_str(), true);
     mqttHaPublish("/light/state", "OFF", true);
     mqttHaPublish("/cover/state", "closed", true);
@@ -48,6 +124,35 @@ void mqttHaInitState() {
     String state;
     serializeJson(doc, state);
     mqttHaPublish("/update/state", state.c_str(), true);
+
+
+    if (appConfig.externalSensorSet) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, appConfig.extSensorData);
+
+        if (error) {
+            logger("Failed to deserialize external sensor data: " + String(error.c_str()), "MQTT", LOG_ERROR);
+            return;
+        }
+
+        if (appConfig.externalSensor == 1) { // AHT10
+            //mqttHaPublish("/ext_sensor/state", appConfig.extSensorData.c_str(), true);
+
+        } else if (appConfig.externalSensor == 2 || appConfig.externalSensor == 3) { // SCD40 or SCD41
+            u_int16_t co2 = doc["co2"];
+            String co2Str = String(co2);
+            mqttHaPublish("/co2/state", co2Str.c_str(), true);
+
+        } else if (appConfig.externalSensor == 4) { // CCS811
+            u_int16_t eco2 = doc["eco2"];
+            String eco2Str = String(eco2);
+            mqttHaPublish("/eco2/state", eco2Str.c_str(), true);
+
+            u_int16_t tvoc = doc["tvoc"];
+            String tvocStr = String(tvoc);
+            mqttHaPublish("/tvoc/state", tvocStr.c_str(), true);
+        }
+    }
 
     delay(250);
 }
@@ -106,6 +211,17 @@ void mqttHaConfig() {
     humiditySensor["unit_of_meas"] = "%";
     humiditySensor["dev_cla"] = "humidity";
     humiditySensor["dev"] = device;
+
+    // pressure sensor
+    // topic: homeassistant/sensor/pandagarage/pressure/config
+    JsonDocument pressureSensor;
+    pressureSensor["name"] = "Pressure";
+    pressureSensor["uniq_id"] = appConfig.name + String("_pressure");
+    pressureSensor["stat_t"] = mqttBase + "/pressure/state";
+    pressureSensor["avty_t"] = availability_topic;
+    pressureSensor["unit_of_meas"] = "hPa";
+    pressureSensor["dev_cla"] = "pressure";
+    pressureSensor["dev"] = device;
 
     // lux sensor
     // topic: homeassistant/sensor/pandagarage/lux/config
@@ -209,12 +325,64 @@ void mqttHaConfig() {
     cover["dev_cla"] = "garage";
     cover["dev"] = device;
 
+
+    // external sensor setup
+    if (appConfig.externalSensorSet) {
+        const uint8_t externalSensorType = appConfig.externalSensor;
+        if (externalSensorType == 1) {
+            // ToDO: AHT10
+            
+        } else if (externalSensorType == 2 || externalSensorType == 3) {
+            JsonDocument co2Sensor;
+            co2Sensor["name"] = "CO2";
+            co2Sensor["uniq_id"] = appConfig.name + String("_co2");
+            co2Sensor["avty_t"] = availability_topic;            
+            co2Sensor["stat_t"] = mqttBase + "/co2/state";
+            co2Sensor["dev"] = device;
+            co2Sensor["dev_cla"] = "carbon_dioxide";
+            co2Sensor["unit_of_meas"] = "ppm";
+
+            String co2Config;
+            serializeJson(co2Sensor, co2Config);
+            mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/co2/config")).c_str(), 0, true, co2Config.c_str());
+
+        } else if (externalSensorType == 4) {
+            JsonDocument eco2Sensor;
+            eco2Sensor["name"] = "eCO2";
+            eco2Sensor["uniq_id"] = appConfig.name + String("_eco2");
+            eco2Sensor["avty_t"] = availability_topic;            
+            eco2Sensor["stat_t"] = mqttBase + "/eco2/state";
+            eco2Sensor["dev"] = device;
+            eco2Sensor["dev_cla"] = "volatile_organic_compounds";
+            eco2Sensor["unit_of_meas"] = "ppm";
+
+            JsonDocument tvocSensor;
+            tvocSensor["name"] = "TVOC";
+            tvocSensor["uniq_id"] = appConfig.name + String("_tvoc");
+            tvocSensor["avty_t"] = availability_topic;            
+            tvocSensor["stat_t"] = mqttBase + "/tvoc/state";
+            tvocSensor["dev"] = device;
+            tvocSensor["dev_cla"] = "volatile_organic_compounds";
+            tvocSensor["unit_of_meas"] = "ppb";
+
+            String eco2Config, tvocConfig;
+            serializeJson(eco2Sensor, eco2Config);
+            serializeJson(tvocSensor, tvocConfig);
+            mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/eco2/config")).c_str(), 0, true, eco2Config.c_str());
+            mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/tvoc/config")).c_str(), 0, true, tvocConfig.c_str());
+
+        } else {
+            logger("Unknown external sensor type", "MQTT", LOG_ERROR);
+        }
+    }
+
     
     // serialize
-    String restartConfig, tempConfig, humidityConfig, luxConfig, updateConfig, lightConfig, ventConfig, halfConfig, toggleConfig, coverConfig;
+    String restartConfig, tempConfig, humidityConfig, pressureConfig, luxConfig, updateConfig, lightConfig, ventConfig, halfConfig, toggleConfig, coverConfig;
     serializeJson(restart, restartConfig);
     serializeJson(tempSensor, tempConfig);
     serializeJson(humiditySensor, humidityConfig);
+    serializeJson(pressureSensor, pressureConfig);
     serializeJson(luxSensor, luxConfig);
     serializeJson(updateSensor, updateConfig);
     serializeJson(light, lightConfig);
@@ -225,27 +393,28 @@ void mqttHaConfig() {
 
 
     // publish
-    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/restart/config")).c_str(), restartConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/temp/config")).c_str(), tempConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/humidity/config")).c_str(), humidityConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/lux/config")).c_str(), luxConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/update/") + appConfig.name + String("/config")).c_str(), updateConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/light/") + appConfig.name + String("/light/config")).c_str(), lightConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/vent/config")).c_str(), ventConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/half/config")).c_str(), halfConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/toggle/config")).c_str(), toggleConfig.c_str(), true);
-    mqttClientHa.publish((String("homeassistant/cover/") + appConfig.name + String("/cover/config")).c_str(), coverConfig.c_str(), true);
+    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/restart/config")).c_str(), 0, true, restartConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/temp/config")).c_str(), 0, true, tempConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/humidity/config")).c_str(), 0, true, humidityConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/pressure/config")).c_str(), 0, true, pressureConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/lux/config")).c_str(), 0, true, luxConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/update/") + appConfig.name + String("/config")).c_str(), 0, true, updateConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/light/") + appConfig.name + String("/light/config")).c_str(), 0, true, lightConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/vent/config")).c_str(), 0, true, ventConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/half/config")).c_str(), 0, true, halfConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/toggle/config")).c_str(), 0, true, toggleConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/cover/") + appConfig.name + String("/cover/config")).c_str(), 0, true, coverConfig.c_str());
 
     mqttHaInitState();
 }
 
 
-void mqttHaListen(char* topic, byte* payload, unsigned int length) {
+void mqttHaListen(const char* topic, const char* payload, unsigned int length) {
     const String mqttBase = String("pandagarage/") + String(appConfig.name);
 
     // restart
     if (strcmp(topic, (mqttBase + "/restart/set").c_str()) == 0) {
-        logger("Restart triggered", "mqtt");
+        logger("Restart triggered", "MQTT", LOG_INFO);
         delay(10);
         ESP.restart();
         return;
@@ -253,7 +422,7 @@ void mqttHaListen(char* topic, byte* payload, unsigned int length) {
 
     // light switch
     if (strcmp(topic, (mqttBase + "/light/switch").c_str()) == 0) {
-        String payloadStr = String((char*)payload, length);
+        String payloadStr = String(payload).substring(0, length);
         
         if (payloadStr == "ON") {
             hoermannEngine->turnLight(true);
@@ -268,7 +437,7 @@ void mqttHaListen(char* topic, byte* payload, unsigned int length) {
 
     // cover command
     if (strcmp(topic, (mqttBase + "/cover/set").c_str()) == 0) {
-        String payloadStr = String((char*)payload, length);
+        String payloadStr = String(payload).substring(0, length);
 
         if (payloadStr == "open") {
             hoermannEngine->openDoor();
@@ -287,7 +456,7 @@ void mqttHaListen(char* topic, byte* payload, unsigned int length) {
 
     // cover position
     if (strcmp(topic, (mqttBase + "/cover/position/set").c_str()) == 0) {
-        String payloadStr = String((char*)payload, length);
+        String payloadStr = String(payload).substring(0, length);
 
         int position = payloadStr.toInt();
         if (position >= 0 && position <= 100) {
@@ -295,7 +464,7 @@ void mqttHaListen(char* topic, byte* payload, unsigned int length) {
             loggerAccess("Door position set to " + String(position), "mqtt");
 
         } else {
-            logger("Invalid cover position command: " + payloadStr, "E");
+            logger("Invalid cover position command: " + payloadStr, "MQTT", LOG_ERROR);
         }
         return;
     }
@@ -322,6 +491,32 @@ void mqttHaListen(char* topic, byte* payload, unsigned int length) {
     }
 }
 
+void onMqttConnect(bool sessionPresent) {
+    logger("Connected to Home Assistant", "MQTT", LOG_DEBUG);
+
+    if(!configSent) {
+        mqttHaConfig();
+        configSent = true;
+        logger("Config sent", "MQTT", LOG_DEBUG);
+    }
+
+    const String topic = String("pandagarage/") + appConfig.name + String("/#");
+    mqttClientHa.subscribe(topic.c_str(), 0);
+}
+
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
+    logger("Disconnected from Home Assistant", "MQTT", LOG_WARNING);
+    mqttInitState = false;
+}
+
+void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+    static char msg[MQTT_PAYLOAD_LEN];
+    size_t copyLen = len < MQTT_PAYLOAD_LEN - 1 ? len : MQTT_PAYLOAD_LEN - 1;
+    memcpy(msg, payload, copyLen);
+    msg[copyLen] = '\0';
+    mqttHaListen(topic, msg, copyLen);
+}
+
 
 int mqttHaReconnect() {
     
@@ -335,94 +530,36 @@ int mqttHaReconnect() {
         mqttClientHa.disconnect();
     }
 
-    int retries = 0;
-    while (!mqttClientHa.connected() && retries < 5) {
+    mqttClientHa.connect();
 
-        if (mqttClientHa.connect(appConfig.name, appConfig.haUser, appConfig.haPwd, (String("pandagarage/") + appConfig.name + "/status").c_str(), 0, true, "offline")) {
-            logger("connected to Home Assistant", "MQTT");
-
-            // send config
-            if(!configSent) {
-                mqttHaConfig();
-                configSent = true;
-                Serial.println("Config sent");
-            }
-
-            // subscribe to topics
-            const String topic = String("pandagarage/") + appConfig.name + String("/#");
-            mqttClientHa.subscribe(topic.c_str());
-
-            return 1;
-
-        } else {
-            logger("HA MQTT failed with state " + mqttClientHa.state(), "E");
-            delay(2000);
-            retries++;
-        }
+    int waitCount = 0;
+    while (!mqttClientHa.connected() && waitCount < 10) {
+        delay(500);
+        waitCount++;
     }
 
-    logger("Failed to connect to HA MQTT after 5 retries", "E");
+    if (mqttClientHa.connected()) {
+        return 1;
+    }
+
+    logger("Failed to connect to HA MQTT", "MQTT", LOG_ERROR);
     return 0;
 }
-
 
 bool mqttHaSetup() {
 
     if (!appConfig.haSet) {
-        logger("Home Assistant not configured!", "E");
+        logger("Home Assistant not configured!", "MQTT", LOG_WARNING);
         return false;
     }
 
-    mqttClientHa.setClient(wifiClientHa);
-    mqttClientHa.setBufferSize(12000);
     mqttClientHa.setServer(appConfig.haIp, appConfig.haPort);
-    mqttClientHa.setCallback(mqttHaListen);
-    mqttClientHa.setSocketTimeout(20);
+    mqttClientHa.setCredentials(appConfig.haUser, appConfig.haPwd);
+    mqttClientHa.onMessage(onMqttMessage);
+    mqttClientHa.onConnect(onMqttConnect);
+    mqttClientHa.onDisconnect(onMqttDisconnect);
 
     return true;
-}
-
-
-void checkForFirmwareUpdate() {
-    WiFiClientSecure client;
-    client.setInsecure();
-
-    String url = "https://api.github.com/repos/derDeno/PandaGarage/releases/latest";
-
-    HTTPClient https;
-    https.begin(client, url);
-    https.addHeader("User-Agent", "PandaGarage");
-
-    int httpCode = https.GET();
-    if (httpCode == HTTP_CODE_OK) {
-        String payload = https.getString();
-        https.end();
-
-        JsonDocument res;
-        auto err = deserializeJson(res, payload);
-        if (err) {
-            Serial.printf("JSON parse failed: %s\n", err.c_str());
-            return;
-        }
-
-        const char* latestTag = res["tag_name"];
-        strcpy(appConfig.latestFw, latestTag);
-
-        JsonDocument doc;
-        doc["installed_version"] = VERSION;
-        doc["latest_version"] = latestTag;
-        doc["entity_picture"] = "https://raw.githubusercontent.com/derDeno/PandaGarage/refs/heads/gh-pages/img/logo.png";
-        doc["release_url"] = "https://github.com/derDeno/PandaGarage/releases/latest";
-        doc["update_percentage"] = nullptr;
-
-        String state;
-        serializeJson(doc, state);
-        mqttHaPublish("/update/state", state.c_str(), true);
-
-    } else {
-        https.end();
-        return;
-    }
 }
 
 void mqttHaLoop() {
@@ -452,7 +589,30 @@ void mqttHaLoop() {
         checkForFirmwareUpdate();
     }
 
-    mqttClientHa.loop();
 }
 
-#endif
+
+// FreeRTOS task
+void mqttTask(void *parameter) {
+    MqttMessage msg;
+    while (true) {
+        mqttHaLoop();
+
+        while (mqttQueue != NULL && xQueueReceive(mqttQueue, &msg, 0) == pdPASS) {
+            if (mqttClientHa.connected()) {
+                mqttClientHa.publish(msg.topic, 0, msg.retain, msg.payload);
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void initMqttTask() {
+    if (mqttQueue == NULL) {
+        mqttQueue = xQueueCreate(20, sizeof(MqttMessage));
+    }
+    if (mqttTaskHandle == NULL) {
+        xTaskCreatePinnedToCore(mqttTask, "MQTTTask", 8192, NULL, 1, &mqttTaskHandle, 0);
+    }
+}
