@@ -1,0 +1,16 @@
+{
+  "name": "PandaGarage",
+  "version": "0.3.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        { "path": "rev-2.0/bootloader.bin", "offset": 4096 },
+        { "path": "rev-2.0/partitions.bin", "offset": 32768 },
+        { "path": "rev-2.0/firmware.bin", "offset": 65536 },
+        { "path": "rev-2.0/filesystem.bin", "offset": 6225920 }
+      ]
+    }
+  ]
+}
