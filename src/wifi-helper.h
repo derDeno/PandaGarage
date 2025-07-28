@@ -17,7 +17,7 @@ extern Preferences pref;
 AsyncEventSource sseScan("/api/network-scan");
 AsyncEventSource sseTest("/api/network-test");
 DNSServer dnsServer;
-IPAddress apIP(192, 168, 4, 1);
+IPAddress apIP(192, 1, 1, 1);
 
 static unsigned long lastAttemptTime = 0;
 const unsigned long reconnectInterval = 5000;
@@ -44,7 +44,7 @@ void setupMDNS() {
 
     // Initialize mDNS with the fallback hostname
     if (!MDNS.begin(hostname)) {
-        logger("Failed to start mDNS with fallback hostname!", "E");
+        logger("Failed to start mDNS with fallback hostname!", "WiFi", LOG_ERROR);
         return;
     }
     delay(100);  // Allow mDNS to stabilize
@@ -57,7 +57,7 @@ void setupMDNS() {
     }
 
     MDNS.addService("http", "tcp", 80);
-    logger("Hostname set to http://" + hostname +".local", "BOOT");
+    logger("Hostname set to http://" + hostname +".local", "BOOT", LOG_INFO);
 }
 
 
@@ -72,13 +72,13 @@ void setupWifi() {
     WiFi.setHostname(appConfig.name);
     WiFi.setSleep(false);
     WiFi.begin(appConfig.wifiSsid, appConfig.wifiPwd);
-    logger("Connecting to WiFi...", "BOOT");
+    logger("Connecting to WiFi...", "BOOT", LOG_INFO);
 
     // Wait for connection with timeout
     auto status = WiFi.waitForConnectResult(WIFI_CONNECT_TIMEOUT_MS);
 
     if (status != WL_CONNECTED) {
-        logger("WiFi connection failed!", "E");
+        logger("WiFi connection failed!", "WiFi", LOG_ERROR);
         connectionAttempts = MAX_CONNECTION_ATTEMPTS;
         return;
     }
@@ -88,9 +88,9 @@ void setupWifi() {
 
     // NTP
     configTime(0, 0, "pool.ntp.org", "time.google.com", "time.cloudflare.com");
-    logger("NTP (UTC):    ok", "BOOT");
-    logger("WiFI:         ok", "BOOT");
-    logger("IP: " + WiFi.localIP().toString(), "BOOT");
+    logger("NTP (UTC): ok", "BOOT", LOG_INFO);
+    logger("WiFI: ok", "BOOT", LOG_INFO);
+    logger("IP: " + WiFi.localIP().toString(), "BOOT", LOG_INFO);
 }
 
 
@@ -98,11 +98,10 @@ void setupWifi() {
 // setup in AP Mode if no WiFi set
 void setupWifiAp() {
     WiFi.mode(WIFI_AP_STA);
-    WiFi.softAP("PandaGarage");
-    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-    delay(100);
+    //WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+    WiFi.softAP("PandaGarage");    
 
-    dnsServer.start(53, "*", apIP);
+    dnsServer.start(53, "*", WiFi.softAPIP());
 
     sseScan.onConnect([](AsyncEventSourceClient *client) {
         scanClients.push_back(client);
@@ -185,7 +184,7 @@ void deliverTestResults(bool result) {
 void WiFiEvent(WiFiEvent_t event) {
     switch(event) {
       case SYSTEM_EVENT_STA_GOT_IP:
-        logger("WiFi connection successful!", "W");
+        logger("WiFi connection successful!", "WiFi", LOG_INFO);
         deliverTestResults(true);
 
         
@@ -201,20 +200,20 @@ void WiFiEvent(WiFiEvent_t event) {
         break;
 
       case SYSTEM_EVENT_STA_DISCONNECTED:
-        logger("WiFi connection failed!", "E");
+        logger("WiFi connection failed!", "WiFi", LOG_ERROR);
         deliverTestResults(false);
         testRequested  = false;
         break;
 
       default:
-        logger("Event: " + String(event), "WiFi");
+        logger("Event: " + String(event), "WiFi", LOG_DEBUG);
         break;
     }
 }
 
 void testWifiStaConnection() {
     
-    logger("Testing credentials...", "WiFi");
+    logger("Testing credentials...", "WiFi", LOG_INFO);
 
     WiFi.begin(appConfig.wifiSsidTest, appConfig.wifiPwdTest);
     WiFi.onEvent(WiFiEvent);
@@ -236,12 +235,12 @@ void wifiLoop() {
                 connectionAttempts++;
                 
                 if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
-                    logger("Attempting WiFi reconnection...", "W");
+                    logger("Attempting WiFi reconnection...", "WiFi", LOG_DEBUG);
                     WiFi.disconnect();
                     WiFi.reconnect();
                     
                 } else {
-                    logger("Max connection attempts reached. Switching to AP mode.", "E");
+                    logger("Max connection attempts reached. Switching to AP mode.", "WiFi", LOG_ERROR);
                     WiFi.disconnect();
                     setupWifiAp();
                 }
@@ -252,7 +251,7 @@ void wifiLoop() {
 
             if (millis() - lastAttemptTime > reconnectInterval) {
                 lastAttemptTime = millis();
-                logger("Lost WiFi connection. Attempting reconnect...", "E");
+                logger("Lost WiFi connection. Attempting reconnect...", "WiFi", LOG_WARNING);
                 WiFi.disconnect();
                 WiFi.reconnect();
             }
