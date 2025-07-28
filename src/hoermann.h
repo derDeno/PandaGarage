@@ -1,6 +1,5 @@
 #include <Stream.h>
 #include <ModbusRTU.h>
-#include <esp_task_wdt.h>
 
 #define MODBUSRTU_DEBUG 1
 #define SLAVE_ID 2
@@ -216,8 +215,6 @@ class HoermannGarageEngine {
 
     void setup() {
 
-        //esp_task_wdt_init(10, false);
-        
         RS485.begin(57600, SERIAL_8E1, RS_RXD, RS_TXD);
         mb.begin(&RS485, RS_EN);
         mb.slave(SLAVE_ID);
@@ -230,9 +227,6 @@ class HoermannGarageEngine {
             configMAX_PRIORITIES - 1,   /* Priority of the task */
             &modBusTask,                /* Task handle. */
             1);                         /* Core where the task should run */
-
-        
-        //esp_task_wdt_add(modBusTask);
 
         // Required for Write
         mb.addHreg(0x9C41, 0, 0x03);  // Commands
@@ -296,7 +290,7 @@ class HoermannGarageEngine {
             mb.Reg(HREG(0x9CB9 + 3), (uint16_t)0x10ff);
             mb.Reg(HREG(0x9CB9 + 4), (uint16_t)0xa845);
         } else if (fc == Modbus::FC_WRITE_REGS && data.reg.address == 0x9D31) {
-            // logger("on Status Update cnt: " + data.regCount, "HCP");
+            // logger("on Status Update cnt: " + data.regCount, "HCP", LOG_DEBUG);
         } else {
             this->state->debugMessage = "unknown function code fc=" + fc;
             this->state->debMessage = true;
@@ -318,7 +312,6 @@ class HoermannGarageEngine {
             if (commandWrittenOn == 0) {
                 regPlug2Value = nextCommand->commandRegPlus2Value;
                 regPlug3Value = nextCommand->commandRegPlus3Value;
-                ESP_LOGI(TAG_HCI, "command start %x %x", regPlug2Value, regPlug3Value);
                 logger("command start " + String(regPlug2Value) + " " + String(regPlug3Value), "HCP", LOG_DEBUG);
                 commandWrittenOn = millis();
             }
@@ -498,7 +491,6 @@ void DelayHandler(void) {
 }
 
 void modbusServeTask(void *parameter) {
-    //esp_task_wdt_add(NULL);
 
     while (true) {
         hoermannEngine->handleModbus();

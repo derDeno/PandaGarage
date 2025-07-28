@@ -3,7 +3,9 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <time.h>
-#include <AsyncMqttClient.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 
 #include "fs-helper.h"
 #include "config.h"
@@ -210,8 +212,8 @@ void loop() {
     
     // check for garage door updates
     if (hoermannEngine->state->isValid() && hoermannEngine->state->changed) {
-      onDoorStateChanged(*hoermannEngine->state);
       hoermannEngine->state->clearChanged();
+      onDoorStateChanged(*hoermannEngine->state);      
     }
 
     // sensor and buzzer handled in dedicated tasks

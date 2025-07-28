@@ -2,7 +2,6 @@
 * Managig MQTT communication with Home Assistant
 */
 #include <AsyncMqttClient.h>
-#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -27,6 +26,7 @@ struct MqttMessage {
 
 QueueHandle_t mqttQueue = NULL;
 TaskHandle_t mqttTaskHandle = NULL;
+
 void mqttTask(void *parameter);
 void initMqttTask();
 void onMqttConnect(bool sessionPresent);
@@ -553,6 +553,7 @@ bool mqttHaSetup() {
         return false;
     }
 
+    mqttClientHa.setClientId(appConfig.name);
     mqttClientHa.setServer(appConfig.haIp, appConfig.haPort);
     mqttClientHa.setCredentials(appConfig.haUser, appConfig.haPwd);
     mqttClientHa.onMessage(onMqttMessage);
@@ -563,10 +564,6 @@ bool mqttHaSetup() {
 }
 
 void mqttHaLoop() {
-
-    if(!appConfig.haSet) {
-        return;
-    }
 
     if (!mqttClientHa.connected()) {
         mqttHaReconnect();
@@ -588,7 +585,6 @@ void mqttHaLoop() {
         lastGhUpdateCheck = millis();
         checkForFirmwareUpdate();
     }
-
 }
 
 
@@ -603,8 +599,7 @@ void mqttTask(void *parameter) {
                 mqttClientHa.publish(msg.topic, 0, msg.retain, msg.payload);
             }
         }
-
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(2000);
     }
 }
 
@@ -613,6 +608,14 @@ void initMqttTask() {
         mqttQueue = xQueueCreate(20, sizeof(MqttMessage));
     }
     if (mqttTaskHandle == NULL) {
-        xTaskCreatePinnedToCore(mqttTask, "MQTTTask", 8192, NULL, 1, &mqttTaskHandle, 0);
+        xTaskCreatePinnedToCore(
+            mqttTask,
+            "MqttTask",
+            10000,
+            NULL,
+            configMAX_PRIORITIES - 3,
+            &mqttTaskHandle,
+            0
+        );
     }
 }

@@ -1,8 +1,6 @@
 #include <Adafruit_Sensor.h>
 #include <BH1750.h>
 #include "Wire.h"
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 
 // external sensors
 #include <Adafruit_AHTX0.h>
@@ -35,9 +33,7 @@ Adafruit_CCS811 ccs;
 Adafruit_VL6180X vl;
 SensirionI2cScd4x scd4x;
 
-unsigned long lastSensorReadTime = 0;
 unsigned long lastBuzzerTime = 0;
-bool isSensorFirstRun = true;
 TaskHandle_t sensorTaskHandle = NULL;
 void sensorTask(void *parameter);
 void initSensorTask();
@@ -198,221 +194,236 @@ void setupSensors() {
 }
 
 void sensorLoop() {
-    unsigned long currentTime = millis();
 
-    if (isSensorFirstRun || currentTime - lastSensorReadTime >= appConfig.sensorUpdateInterval) {
-        isSensorFirstRun = false;
-        lastSensorReadTime = currentTime;
+    #ifdef HW1
+        float temp = hdc1080.readTemperature();
+        float humid = hdc1080.readHumidity();
+        float pressure = 0;
+    #endif
 
-        #ifdef HW1
-            float temp = hdc1080.readTemperature();
-            float humid = hdc1080.readHumidity();
-            float pressure = 0;
-        #endif
+    #ifdef HW2
+        float temp = bme.readTemperature();
+        float humid = bme.readHumidity();
+        float pressure = bme.readPressure() / 100.0F; // convert to hPa
+    #endif
 
-        #ifdef HW2
-            float temp = bme.readTemperature();
-            float humid = bme.readHumidity();
-            float pressure = bme.readPressure() / 100.0F; // convert to hPa
-        #endif
+    // convert to fahrenheit if set so
+    bool isCelsius = (appConfig.tempUnit == 0) ? true : false;
+    if (!isCelsius) {
+        temp = (temp * 9.0 / 5.0) + 32.0;
+    }
 
-        // convert to fahrenheit if set so
-        bool isCelsius = (appConfig.tempUnit == 0) ? true : false;
-        if (!isCelsius) {
-            temp = (temp * 9.0 / 5.0) + 32.0;
-        }
-
-        float lux = lightMeter.readLightLevel();
+    float lux = lightMeter.readLightLevel();
 
 
-        // external sensors
-        if (appConfig.externalSensorSet) {
-            if (appConfig.externalSensor == 1) {  // AHT10
-               
-                sensors_event_t humidity, temperature;
-                aht.getEvent(&humidity, &temperature);
+    // external sensors
+    if (appConfig.externalSensorSet) {
+        if (appConfig.externalSensor == 1) {  // AHT10
+            
+            sensors_event_t humidity, temperature;
+            aht.getEvent(&humidity, &temperature);
 
-                if (!isCelsius) {
-                    temperature.temperature = (temperature.temperature * 9.0 / 5.0) + 32.0;
-                }
+            if (!isCelsius) {
+                temperature.temperature = (temperature.temperature * 9.0 / 5.0) + 32.0;
+            }
 
-                if (appConfig.combineSensors) {
-                    temp = (temp + temperature.temperature) / 2.0;
-                    humid = (humid + humidity.relative_humidity) / 2.0;
-                }
+            if (appConfig.combineSensors) {
+                temp = (temp + temperature.temperature) / 2.0;
+                humid = (humid + humidity.relative_humidity) / 2.0;
+            }
 
-                // convert sensor data to JSON string
-                JsonDocument doc;
-                doc["temperature"] = temperature.temperature;
-                doc["humidity"] = humidity.relative_humidity;
-                serializeJson(doc, appConfig.extSensorData);
+            // convert sensor data to JSON string
+            JsonDocument doc;
+            doc["temperature"] = temperature.temperature;
+            doc["humidity"] = humidity.relative_humidity;
+            serializeJson(doc, appConfig.extSensorData);
 
-            } else if (appConfig.externalSensor == 2 || appConfig.externalSensor == 3) { // SCD40 or SCD41
-                
-                uint16_t co2;
-                float temperature, humidity;
-                scd4x.readMeasurement(co2, temperature, humidity);
+        } else if (appConfig.externalSensor == 2 || appConfig.externalSensor == 3) { // SCD40 or SCD41
+            
+            uint16_t co2;
+            float temperature, humidity;
+            scd4x.readMeasurement(co2, temperature, humidity);
 
-                if (co2 > 8000) {
-                    // uncalibrated reading, therefore invalid
-                    return;
-                }
+            if (co2 > 8000) {
+                // uncalibrated reading, therefore invalid
+                return;
+            }
 
-                if (!isCelsius) {
-                    temperature = (temperature * 9.0 / 5.0) + 32.0;
-                }
+            if (!isCelsius) {
+                temperature = (temperature * 9.0 / 5.0) + 32.0;
+            }
+
+            if (appConfig.combineSensors) {
+                temp = (temp + temperature) / 2.0;
+                humid = (humid + humidity) / 2.0;
+            }
+
+            // convert sensor data to JSON string
+            JsonDocument doc;
+            doc["co2"] = co2;
+            doc["temperature"] = temperature;
+            doc["humidity"] = humidity;
+            serializeJson(doc, appConfig.extSensorData);
+
+            // mqtt update
+            String payload = String(co2);
+            mqttHaPublish("/co2/state", payload.c_str(), true);
+
+        } else if (appConfig.externalSensor == 4) { // CCS811
+
+            if (ccs.available()) {
+                float temperature = ccs.calculateTemperature();
 
                 if (appConfig.combineSensors) {
                     temp = (temp + temperature) / 2.0;
-                    humid = (humid + humidity) / 2.0;
                 }
 
-                // convert sensor data to JSON string
-                JsonDocument doc;
-                doc["co2"] = co2;
-                doc["temperature"] = temperature;
-                doc["humidity"] = humidity;
-                serializeJson(doc, appConfig.extSensorData);
+                if (!ccs.readData()) {
+                    float eCO2 = ccs.geteCO2();
+                    float TVOC = ccs.getTVOC();
 
-                // mqtt update
-                String payload = String(co2);
-                mqttHaPublish("/co2/state", payload.c_str(), true);
+                    // convert sensor data to JSON string
+                    JsonDocument doc;
+                    doc["eco2"] = eCO2;
+                    doc["tvoc"] = TVOC;
+                    doc["temperature"] = temperature;
+                    serializeJson(doc, appConfig.extSensorData);
 
-            } else if (appConfig.externalSensor == 4) { // CCS811
+                    // mqtt update
+                    String payload = String(eCO2);
+                    mqttHaPublish("/eco2/state", payload.c_str(), true);
 
-                if (ccs.available()) {
-                    float temperature = ccs.calculateTemperature();
-
-                    if (appConfig.combineSensors) {
-                        temp = (temp + temperature) / 2.0;
-                    }
-
-                    if (!ccs.readData()) {
-                        float eCO2 = ccs.geteCO2();
-                        float TVOC = ccs.getTVOC();
-
-                        // convert sensor data to JSON string
-                        JsonDocument doc;
-                        doc["eco2"] = eCO2;
-                        doc["tvoc"] = TVOC;
-                        doc["temperature"] = temperature;
-                        serializeJson(doc, appConfig.extSensorData);
-
-                        // mqtt update
-                        String payload = String(eCO2);
-                        mqttHaPublish("/eco2/state", payload.c_str(), true);
-
-                        String payload2 = String(TVOC);
-                        mqttHaPublish("/tvoc/state", payload2.c_str(), true);
-                    }
+                    String payload2 = String(TVOC);
+                    mqttHaPublish("/tvoc/state", payload2.c_str(), true);
                 }
-            } else if (appConfig.externalSensor == 5) { // VL6180X
-
-                float vlLux = vl.readLux(VL6180X_ALS_GAIN_5);
-                uint8_t range = vl.readRange();
-                uint8_t status = vl.readRangeStatus();
-
-                if (appConfig.combineSensors) {
-                    lux = (lux + vlLux) / 2.0;
-                }
-
-                JsonDocument doc;
-                doc["lux"] = vlLux;
-                doc["range"] = range;
-                serializeJson(doc, appConfig.extSensorData);
-
-                // mqtt update
-                //String payload = String(range);
-                //mqttHaPublish("/vl_range/state", payload.c_str(), true);
             }
-        }
+        } else if (appConfig.externalSensor == 5) { // VL6180X
 
+            float vlLux = vl.readLux(VL6180X_ALS_GAIN_5);
+            uint8_t range = vl.readRange();
+            uint8_t status = vl.readRangeStatus();
 
-        // check if value change is above threshold
-        bool tempChanged = fabs(temp - appConfig.temperature) >= appConfig.tempThreshold;
-        bool humidityChanged = fabs(humid - appConfig.humidity) >= appConfig.humThreshold;
-        bool pressureChanged = fabs(pressure - appConfig.pressure) >= appConfig.presThreshold;
-        bool luxChanged = fabs(lux - appConfig.lux) >= appConfig.luxThreshold;
-
-        // check if any sensor value changed
-        if (tempChanged) {
-            appConfig.temperature = temp;
-
-            // push mqtt update
-            String payload = String(temp, 2);
-            mqttHaPublish("/temp/state", payload.c_str(), true);
-
-            // push SSE update
-            JsonDocument sensor;
-            sensor["temperature"] = payload;
+            if (appConfig.combineSensors) {
+                lux = (lux + vlLux) / 2.0;
+            }
 
             JsonDocument doc;
-            doc["sensor"] = sensor;
+            doc["lux"] = vlLux;
+            doc["range"] = range;
+            serializeJson(doc, appConfig.extSensorData);
 
-            String response;
-            serializeJson(doc, response);
-            events.send(response.c_str(), "door", millis());
+            // mqtt update
+            //String payload = String(range);
+            //mqttHaPublish("/vl_range/state", payload.c_str(), true);
         }
+    }
 
-        if (humidityChanged) {
-            appConfig.humidity = humid;
 
-            // push mqtt update
-            String payload = String(humid, 2);
-            mqttHaPublish("/humidity/state", payload.c_str(), true);
+    // check if value change is above threshold
+    bool tempChanged = fabs(temp - appConfig.temperature) >= appConfig.tempThreshold;
+    bool humidityChanged = fabs(humid - appConfig.humidity) >= appConfig.humThreshold;
+    bool pressureChanged = fabs(pressure - appConfig.pressure) >= appConfig.presThreshold;
+    bool luxChanged = fabs(lux - appConfig.lux) >= appConfig.luxThreshold;
 
-            // push SSE update
-            JsonDocument sensor;
-            sensor["humidity"] = payload;
+    // check if any sensor value changed
+    if (tempChanged) {
+        appConfig.temperature = temp;
 
-            JsonDocument doc;
-            doc["sensor"] = sensor;
+        // push mqtt update
+        String payload = String(temp, 2);
+        mqttHaPublish("/temp/state", payload.c_str(), true);
 
-            String response;
-            serializeJson(doc, response);
-            events.send(response.c_str(), "door", millis());
-        }
+        // push SSE update
+        JsonDocument sensor;
+        sensor["temperature"] = payload;
 
-        if (pressureChanged) {
-            appConfig.pressure = pressure;
+        JsonDocument doc;
+        doc["sensor"] = sensor;
 
-            // push mqtt update
-            String payload = String(pressure, 2);
-            mqttHaPublish("/pressure/state", payload.c_str(), true);
+        String response;
+        serializeJson(doc, response);
+        events.send(response.c_str(), "door", millis());
+    }
 
-            // push SSE update
-            JsonDocument sensor;
-            sensor["pressure"] = payload;
+    if (humidityChanged) {
+        appConfig.humidity = humid;
 
-            JsonDocument doc;
-            doc["sensor"] = sensor;
+        // push mqtt update
+        String payload = String(humid, 2);
+        mqttHaPublish("/humidity/state", payload.c_str(), true);
 
-            String response;
-            serializeJson(doc, response);
-            events.send(response.c_str(), "door", millis());
-        }
+        // push SSE update
+        JsonDocument sensor;
+        sensor["humidity"] = payload;
 
-        if (luxChanged) {
-            appConfig.lux = lux;
+        JsonDocument doc;
+        doc["sensor"] = sensor;
 
-            // push mqtt update
-            String payload = String(lux, 2);
-            mqttHaPublish("/lux/state", payload.c_str(), true);
+        String response;
+        serializeJson(doc, response);
+        events.send(response.c_str(), "door", millis());
+    }
 
-            // push SSE update
-            JsonDocument sensor;
-            sensor["lux"] = payload;
+    if (pressureChanged) {
+        appConfig.pressure = pressure;
 
-            JsonDocument doc;
-            doc["sensor"] = sensor;
+        // push mqtt update
+        String payload = String(pressure, 2);
+        mqttHaPublish("/pressure/state", payload.c_str(), true);
 
-            String response;
-            serializeJson(doc, response);
-            events.send(response.c_str(), "door", millis());
-        }
+        // push SSE update
+        JsonDocument sensor;
+        sensor["pressure"] = payload;
+
+        JsonDocument doc;
+        doc["sensor"] = sensor;
+
+        String response;
+        serializeJson(doc, response);
+        events.send(response.c_str(), "door", millis());
+    }
+
+    if (luxChanged) {
+        appConfig.lux = lux;
+
+        // push mqtt update
+        String payload = String(lux, 2);
+        mqttHaPublish("/lux/state", payload.c_str(), true);
+
+        // push SSE update
+        JsonDocument sensor;
+        sensor["lux"] = payload;
+
+        JsonDocument doc;
+        doc["sensor"] = sensor;
+
+        String response;
+        serializeJson(doc, response);
+        events.send(response.c_str(), "door", millis());
+    }
+    
+}
+
+void sensorTask(void *parameter) {
+    while (true) {
+        sensorLoop();
+        vTaskDelay(appConfig.sensorUpdateInterval);
     }
 }
 
+void initSensorTask() {
+    if (sensorTaskHandle == NULL) {
+        xTaskCreatePinnedToCore(
+            sensorTask,
+            "SensorTask",
+            10000,
+            NULL,
+            configMAX_PRIORITIES,
+            &sensorTaskHandle,
+            0
+        );
+    }
+}
 
 // parse restart reason to string
 String restartReasonString(int reason) {
@@ -435,18 +446,5 @@ String restartReasonString(int reason) {
             return "Brownout (voltage drop)";
         default:
             return "Unknown reason";
-    }
-}
-
-void sensorTask(void *parameter) {
-    while (true) {
-        sensorLoop();
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-}
-
-void initSensorTask() {
-    if (sensorTaskHandle == NULL) {
-        xTaskCreatePinnedToCore(sensorTask, "SensorTask", 8192, NULL, 1, &sensorTaskHandle, 0);
     }
 }

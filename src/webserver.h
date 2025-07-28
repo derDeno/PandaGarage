@@ -634,6 +634,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         doc["version_hw"] = appConfig.hwRev;
         doc["sn"] = appConfig.serialNumber;
         doc["uptime"] = millis();
+        doc["freeHeap"] = ESP.getFreeHeap();
 
         serializeJson(doc, *response);
         request->send(response);
@@ -653,6 +654,8 @@ void setupApiRoutes(AsyncWebServer &server) {
         hw["version_hw"] = appConfig.hwRev;
         hw["sn"] = appConfig.serialNumber;
         hw["uptime"] = millis();
+        hw["restartReason"] = restartReasonString(esp_reset_reason());
+        hw["freeHeap"] = ESP.getFreeHeap();
 
         JsonDocument door;
         door["position_current"] = (int)(hoermannEngine->state->currentPosition * 100);
