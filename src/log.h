@@ -11,51 +11,20 @@
 struct tm timeinfo;
 const size_t MAX_LOG_FILE_SIZE = 50 * 1024;  // 50 KB
 extern AppConfig appConfig;
+extern AsyncEventSource events;
 
 QueueHandle_t logQueue = NULL;
 TaskHandle_t logTaskHandle = NULL;
 
 struct LogMessage {
     const char *fileName;
-    char data[LOG_MSG_LEN];
+    char data[LOG_MSG_LEN]; 
 };
-
-enum LOG_LVL {
-    LOG_NONE,
-    LOG_DEBUG,
-    LOG_INFO,
-    LOG_WARNING,
-    LOG_ERROR
-};
-
-// escape strings for csv output if needed
-String escapeCSVField(const String &field) {
-    bool needsQuotes = field.indexOf(';') != -1 ||
-                       field.indexOf('"') != -1 ||
-                       field.indexOf('\n') != -1;
-
-    if (!needsQuotes) {
-        return field;
-    }
-
-    String escaped = "\"";  // opening quote
-
-    for (unsigned int i = 0; i < field.length(); i++) {
-        char c = field[i];
-        if (c == '"') {
-            escaped += "\"\"";  // escape " as ""
-        } else {
-            escaped += c;
-        }
-    }
-
-    escaped += "\"";  // closing quote
-    return escaped;
-}
 
 
 // check the log file size and trim if needed
-void checkLogFileSize(const char *fileName) {
+void checkLogFileSize(const char* fileName) {
+
     File logFile = LittleFS.open(fileName, "r");
     if (!logFile) {
         Serial.println("Failed to open log file for reading");
@@ -113,6 +82,7 @@ void logTask(void *parameter) {
     }
 }
 
+
 void initLogger() {
     if (logQueue == NULL) {
         logQueue = xQueueCreate(20, sizeof(LogMessage));
@@ -120,42 +90,52 @@ void initLogger() {
     }
 }
 
+
 // log data to serial and file
-void logger(String logData, String tag = "", LOG_LVL level = LOG_DEBUG) {
-    // if false, no serial output to reduce load
-    if (DEBUG) {
-        Serial.println(logData);
-    }
+void logger(String logData, String tag = "") {
 
-    // skip logging if the level is lower than the configured log level
-    if (level < appConfig.logLevel) {
-        return;
-    }
+    // push straight to Serial
+    Serial.println(logData);
 
+    // further process for other listeners
     char timeStringBuff[25];
     if (getLocalTime(&timeinfo, 0)) {
-        strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        strftime(timeStringBuff, sizeof(timeStringBuff), "[%Y-%m-%d %H:%M:%S]", &timeinfo);
     } else {
-        strncpy(timeStringBuff, "1970-01-01 00:00:00", sizeof(timeStringBuff));
+        strncpy(timeStringBuff, "[1970-01-01 00:00:00]", sizeof(timeStringBuff));
         timeStringBuff[sizeof(timeStringBuff) - 1] = '\0';
     }
 
-    // create the log in csv format. time;lvl;tag;data
-    String escaped = escapeCSVField(logData);
-    String message = String(timeStringBuff) + ";" + level + ";" + tag + ";" + escaped;
+    String logMessage = String(timeStringBuff);
+    if (tag.length() > 0) {
+        logData = "[" + tag + "] - " + logData;
+    }
+    logMessage += " - " + logData;
+
+    // if connected to WiFi, send log message via SSE
+    if(WiFi.status() == WL_CONNECTED) {
+        events.send(logData, "log");
+    }
+
+    // if debug logging is false quit
+    if (!appConfig.logDebug) {
+        return;
+    }
 
     // logging set to true so log to file using background task
     if (logQueue != NULL) {
         LogMessage msg;
-        msg.fileName = "/log.csv";
-        strncpy(msg.data, message.c_str(), LOG_MSG_LEN - 1);
+        msg.fileName = "/log.txt";
+        strncpy(msg.data, logMessage.c_str(), LOG_MSG_LEN - 1);
         msg.data[LOG_MSG_LEN - 1] = '\0';
         xQueueSend(logQueue, &msg, 0);
     }
 }
 
+
 // access log to file
 void loggerAccess(String logData, String source) {
+
     // if access logging is false quit
     if (!appConfig.logAccess) {
         return;
@@ -180,8 +160,9 @@ void loggerAccess(String logData, String source) {
     }
 }
 
+
 // delete log file
-void deleteLogFile(const char *fileName) {
+void deleteLogFile(const char* fileName) {
     if (LittleFS.exists(fileName)) {
         LittleFS.remove(fileName);
     }
@@ -191,7 +172,7 @@ void deleteLogFile(const char *fileName) {
 class StringPrinter : public Print {
     String &out;
 
-   public:
+public:
     StringPrinter(String &s) : out(s) {}
     size_t write(uint8_t c) override {
         out += (char)c;

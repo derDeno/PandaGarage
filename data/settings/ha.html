@@ -27,6 +27,7 @@
         </div>
     </nav>
     <div class="container" style="padding-top: 20px;">
+        <div class="alert alert-success" role="alert" id="alert-saved-ha-settings"><strong i18n="alert-ha">Home Assistant settings saved successfuly</strong></div>
         <div class="row" style="padding-bottom: 10px;">
             <div class="col"><a class="btn btn-secondary" role="button" href="/settings" i18n="btn-return-settings">❮ Settings</a></div>
         </div>
@@ -40,18 +41,6 @@
                     <div class="input-group" style="padding-bottom: 10px;"><span class="input-group-text" i18n="input-port">Port</span><input class="form-control" type="text" id="pref-ha-port"></div>
                     <div class="input-group" style="padding-bottom: 10px;"><span class="input-group-text" i18n="input-user">Username</span><input class="form-control" type="text" id="pref-ha-user"></div>
                     <div class="input-group" style="padding-bottom: 10px;"><span class="input-group-text" i18n="input-pwd">Password</span><input class="form-control" type="password" id="pref-ha-pwd"><button class="btn btn-secondary" id="btn-toggle-pwd" type="button"><img id="pwd-icon" src="../assets/img/eye.svg" width="25px" height="25px"></button></div><button class="btn btn-primary" id="btn-save" type="button" i18n="btn-save">Save</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="modal fade" role="dialog" tabindex="-1" data-bs-backdrop="static" id="modal-saved">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <div class="modal-body" style="text-align: center;"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16" class="bi bi-patch-check-fill text-center text-success" style="font-size: 100px;margin-bottom: 10px;">
-                        <path d="M10.067.87a2.89 2.89 0 0 0-4.134 0l-.622.638-.89-.011a2.89 2.89 0 0 0-2.924 2.924l.01.89-.636.622a2.89 2.89 0 0 0 0 4.134l.637.622-.011.89a2.89 2.89 0 0 0 2.924 2.924l.89-.01.622.636a2.89 2.89 0 0 0 4.134 0l.622-.637.89.011a2.89 2.89 0 0 0 2.924-2.924l-.01-.89.636-.622a2.89 2.89 0 0 0 0-4.134l-.637-.622.011-.89a2.89 2.89 0 0 0-2.924-2.924l-.89.01-.622-.636zm.287 5.984-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 8.793l2.646-2.647a.5.5 0 0 1 .708.708z"></path>
-                    </svg>
-                    <h3 i18n="title-saved-ha"><strong><span style="color: rgb(10, 54, 34);">Home Assistant settings saved!</span></strong></h3>
-                    <p i18n="text-restart-now">Will restart now...</p>
                 </div>
             </div>
         </div>

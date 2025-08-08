@@ -27,6 +27,7 @@
         </div>
     </nav>
     <div class="container" id="content" style="padding-top: 20px;">
+        <div class="alert alert-success" role="alert" id="alert-saved-device"><strong i18n="alert-device">Device settings saved successfuly!</strong></div>
         <div class="row" style="padding-bottom: 10px;">
             <div class="col"><a class="btn btn-secondary" role="button" href="/settings" i18n="btn-return-settings">❮ Settings</a></div>
             <div class="col text-end"><button class="btn btn-primary" id="btn-save" type="button" i18n="btn-save">Save</button></div>
@@ -56,7 +57,6 @@
                 <p style="margin: 0px;margin-bottom: 10px;margin-top: 10px;padding-top: 10px;" i18n="text-sensor-threshold">These values define the thresholds for registering changes. For example, a temperature threshold of 1 means that temperature fluctuations will only be recorded and displayed when the reading varies by at least one degree Celsius.</p>
                 <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-threshold-temp">Temperature Threshold</span><input class="form-control" type="number" id="pref-device-threshold-temp" step=".5"></div>
                 <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-threshold-hum">Humidity Threshold</span><input class="form-control" type="number" id="pref-device-threshold-hum" step="1"></div>
-                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-threshold-pres">Pressure Threshold</span><input class="form-control" type="number" id="pref-device-threshold-pres" step="1"></div>
                 <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-threshold-lux">Light Threshold</span><input class="form-control" type="number" id="pref-device-threshold-lux" step="10"></div>
             </div>
         </div>
@@ -72,10 +72,8 @@
                             <option value="1">AHT10 - Temperature &amp; Humidity</option>
                             <option value="2">SCD40 - CO2 Sensor</option>
                             <option value="3">SCD41 - CO2 Sensor</option>
-                            <option value="4">CCS811 -VOC Sensor</option>
-                            <option value="5">VL6180X - Distance Sensor</option>
+                            <option value="4">CCS811 - CO2 Sensor</option>
                         </select></div>
-                    <div class="form-check form-switch" style="margin-top: 10px;"><input class="form-check-input" type="checkbox" id="pref-device-sensor-external-combine"><label class="form-check-label" for="pref-device-sensor-external-combine" i18n="input-combine-sensors">Combine sensors of same type</label></div>
                 </div>
             </div>
         </div>
@@ -99,19 +97,13 @@
         <div class="card" style="margin-bottom: 20px;">
             <div class="card-body">
                 <h4 class="card-title" id="i18n" style="padding-bottom: 15px;" i18n="title-logging">Logging</h4>
-                <div class="form-check form-switch" style="margin-bottom: 10px;"><input class="form-check-input" type="checkbox" id="pref-device-access-logging"><label class="form-check-label" for="pref-device-access-logging" i18n=""><strong i18n="input-log-access">Access logging:&nbsp;</strong><span i18n="text-log-access">Keeps a record of every garage door interaction made through PandaGarage</span></label></div>
-                <div class="input-group" style="margin-bottom: 10px;"><span class="input-group-text" i18n="input-log-level">Log Level</span><select class="form-select" id="pref-device-log-level">
-                        <option value="0" selected="">None</option>
-                        <option value="1">Debug</option>
-                        <option value="2">Info</option>
-                        <option value="3">Warning</option>
-                        <option value="4">Error</option>
-                    </select></div><button class="btn btn-secondary" id="btn-diagnose" type="button" style="margin-top: 10px;" i18n="btn-diagnose">Download Diagnostics</button>
+                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="pref-device-access-logging"><label class="form-check-label" for="pref-device-access-logging" i18n=""><strong i18n="input-log-access">Access logging:&nbsp;</strong><span i18n="text-log-access">Keeps a record of every garage door interaction made through PandaGarage</span></label></div>
+                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="pref-device-debug-logging"><label class="form-check-label" for="pref-device-debug-logging" i18n=""><strong i18n="input-log-debug">Debug logging:&nbsp;</strong><span i18n="text-log-debug">Records various internal actions of PandaGarage to help with troubleshooting and debugging</span></label></div><button class="btn btn-secondary" id="btn-diagnose" type="button" style="margin-top: 10px;" i18n="btn-diagnose">Download Diagnostics</button>
             </div>
         </div>
         <div class="card" style="margin-bottom: 20px;">
             <div class="card-body">
-                <h4 class="card-title" i18n="title-reset-device-1">Reset Device</h4>
+                <h4 class="card-title" style="padding-bottom: 15px;" i18n="title-reset-device-1">Reset Device</h4>
                 <p><span i18n="text-reset-device-1"><br>Reset your device to factory settings.</span><strong i18n="text-reset-device-2">THIS WILL DELETE YOUR SETTINGS!</strong></p><button class="btn btn-danger" id="btn-reset" type="button" i18n="btn-reset">RESET</button>
             </div>
         </div>
@@ -126,18 +118,6 @@
                     <p i18n="text-reset-device-3">Do you really want to reset your PandaGarage to factory settings?</p>
                 </div>
                 <div class="modal-footer"><button class="btn btn-danger" id="btn-reset-modal" type="button" i18n="btn-reset-verify">Yes, Reset</button></div>
-            </div>
-        </div>
-    </div>
-    <div class="modal fade" role="dialog" tabindex="-1" data-bs-backdrop="static" id="modal-saved">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <div class="modal-body" style="text-align: center;"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16" class="bi bi-patch-check-fill text-center text-success" style="font-size: 100px;margin-bottom: 10px;">
-                        <path d="M10.067.87a2.89 2.89 0 0 0-4.134 0l-.622.638-.89-.011a2.89 2.89 0 0 0-2.924 2.924l.01.89-.636.622a2.89 2.89 0 0 0 0 4.134l.637.622-.011.89a2.89 2.89 0 0 0 2.924 2.924l.89-.01.622.636a2.89 2.89 0 0 0 4.134 0l.622-.637.89.011a2.89 2.89 0 0 0 2.924-2.924l-.01-.89.636-.622a2.89 2.89 0 0 0 0-4.134l-.637-.622.011-.89a2.89 2.89 0 0 0-2.924-2.924l-.89.01-.622-.636zm.287 5.984-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 8.793l2.646-2.647a.5.5 0 0 1 .708.708z"></path>
-                    </svg>
-                    <h3 i18n="title-saved-device"><strong><span style="color: rgb(10, 54, 34);">Device settings saved!</span></strong></h3>
-                    <p i18n="text-restart-now">Will restart now...</p>
-                </div>
             </div>
         </div>
     </div>
