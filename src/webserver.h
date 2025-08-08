@@ -89,16 +89,42 @@ String processorInfo(const String &var) {
 
     } else if (var == "TEMPLATE_DEVICE_SERIAL") {
         return appConfig.serialNumber;
-
-    } else if (var == "TEMPLATE_RESTART_REASON") {
-        return restartReasonString(esp_reset_reason());
     }
 
     return String();
 }
 
 String processorLogs(const String &var) {
-    if (var == "LOG_ACCESS_TEMPLATE") {
+    if (var == "LOG_DEBUG_TEMPLATE") {
+        // check if logging is even active
+        bool logging = appConfig.logDebug;
+
+        if (!logging) {
+            return "Debug logging is disabled!";
+        }
+
+        File logFile = LittleFS.open("/log.txt", "r");
+        String logContent = "";
+        if (logFile) {
+            while (logFile.available()) {
+                String temp = logFile.readStringUntil('\n');
+
+                // check if string begins with E: or W: and colorize it
+                if (temp.indexOf("[E]") != -1) {
+                    logContent += "<span class='text-danger'>" + temp + "</span><br>";
+                } else if (temp.indexOf("[W]") != -1) {
+                    logContent += "<span class='text-primary'>" + temp + "</span><br>";
+                } else {
+                    logContent += temp + "<br>";
+                }
+            }
+            logFile.close();
+        } else {
+            logContent = "Log file not found!";
+        }
+        return logContent;
+
+    } else if (var == "LOG_ACCESS_TEMPLATE") {
         // check if logging is even active
         bool logging = appConfig.logAccess;
 
@@ -125,7 +151,7 @@ String processorLogs(const String &var) {
             }
             logFile.close();
         } else {
-            logContent = "empty";
+            logContent = "Log file not found!";
         }
         return logContent;
     }
@@ -139,7 +165,7 @@ void handleOtaFw(AsyncWebServerRequest *request, const String &filename, size_t 
 
     if (index == 0) {
         vTaskSuspend(modBusTask);
-        logger("OTA Firmware update start: " + filename, "Device", LOG_INFO);
+        logger("OTA Firmware update start: " + filename, "W");
 
         if (!Update.begin(request->contentLength())) {
             Update.printError(Serial);
@@ -156,7 +182,7 @@ void handleOtaFw(AsyncWebServerRequest *request, const String &filename, size_t 
             StringPrinter sp(errMsg);
 
             Update.printError(sp);
-            logger(errMsg, "Device", LOG_ERROR);
+            logger(errMsg, "E");
             events.send(errMsg, "ota-progress", millis());
 
             vTaskResume(modBusTask);
@@ -176,7 +202,7 @@ void handleOtaFw(AsyncWebServerRequest *request, const String &filename, size_t 
     if (final) {
         if (Update.end(true)) {
             String msg = "Firmware update success: " + String(index + len) + "bytes written";
-            logger(msg, "Device", LOG_INFO);
+            logger(msg, "Device");
             events.send("100", "ota-progress", millis());
 
         } else {
@@ -184,7 +210,7 @@ void handleOtaFw(AsyncWebServerRequest *request, const String &filename, size_t 
             StringPrinter sp(errMsg);
             
             Update.printError(sp);
-            logger(errMsg, "Device", LOG_ERROR);
+            logger(errMsg, "E");
             events.send(errMsg, "ota-progress", millis());
         }
         
@@ -197,7 +223,7 @@ void handleOtaFs(AsyncWebServerRequest *request, const String &filename, size_t 
 
     if (index == 0) {
         vTaskSuspend(modBusTask);
-        logger("OTA Filesystem update start: " + filename, "Device", LOG_INFO);
+        logger("OTA Filesystem update start: " + filename, "W");
 
         // fixed size for SPIFFS
         if (!Update.begin(0x200000, U_SPIFFS)) {
@@ -225,7 +251,7 @@ void handleOtaFs(AsyncWebServerRequest *request, const String &filename, size_t 
     if (final) {
         if (Update.end(true)) {
             String msg = "Filesystem update success: " + String(index + len) + "bytes written";
-            logger(msg, "Device", LOG_INFO);
+            logger(msg, "Device");
             events.send("100", "ota-progress", millis());
 
         } else {
@@ -249,16 +275,14 @@ void setupSettingsRoutes(AsyncWebServer &server) {
         doc["sensorUpdateInterval"] = appConfig.sensorUpdateInterval;
         doc["thresholdTemp"] = appConfig.tempThreshold;
         doc["thresholdHumidity"] = appConfig.humThreshold;
-        doc["thresholdPressure"] = appConfig.presThreshold;
         doc["thresholdLight"] = appConfig.luxThreshold;
         doc["externalSensorSet"] = appConfig.externalSensorSet;
         doc["externalSensor"] = appConfig.externalSensor;
-        doc["combineSensors"] = appConfig.combineSensors;
         doc["buzzerSet"] = appConfig.buzzerSet;
         doc["buzzerTune"] = appConfig.buzzerTune;
         doc["buzzerOpening"] = appConfig.buzzerOpening;
         doc["buzzerClosing"] = appConfig.buzzerClosing;
-        doc["logLevel"] = appConfig.logLevel;
+        doc["logDebug"] = appConfig.logDebug;
         doc["logAccess"] = appConfig.logAccess;
 
         serializeJson(doc, *response);
@@ -300,11 +324,6 @@ void setupSettingsRoutes(AsyncWebServer &server) {
             pref.putInt("thresholdHum", thresholdHum);
         }
 
-        if (request->hasParam("thresholdPressure", true)) {
-            const int thresholdPres = request->getParam("thresholdPressure", true)->value().toInt();
-            pref.putInt("thresholdPres", thresholdPres);
-        }
-
         if (request->hasParam("thresholdLight", true)) {
             const int thresholdLight = request->getParam("thresholdLight", true)->value().toInt();
             pref.putInt("thresholdLux", thresholdLight);
@@ -324,17 +343,6 @@ void setupSettingsRoutes(AsyncWebServer &server) {
         if (request->hasParam("externalSensor", true)) {
             const int externalSensor = request->getParam("externalSensor", true)->value().toInt();
             pref.putInt("extSensor", externalSensor);
-        }
-
-        if (request->hasParam("combineSensors", true)) {
-            const String val = request->getParam("combineSensors", true)->value();
-
-            bool combineSensors = false;
-            if (val == "true" || val == "1") {
-                combineSensors = true;
-            }
-
-            pref.putBool("combineSensors", combineSensors);
         }
 
         if (request->hasParam("buzzerSet", true)) {
@@ -375,10 +383,21 @@ void setupSettingsRoutes(AsyncWebServer &server) {
             pref.putBool("buzzerClosing", buzzerClosing);
         }
 
-        if (request->hasParam("logLevel", true)) {
-            const uint8_t val = request->getParam("logLevel", true)->value().toInt();
+        if (request->hasParam("logDebug", true)) {
+            const String val = request->getParam("logDebug", true)->value();
 
-            pref.putInt("logLevel", val);
+            bool logDebug = false;
+            if (val == "true" || val == "1") {
+                logDebug = true;
+            }
+
+            pref.putBool("logDebug", logDebug);
+            Serial.println("Debug logging: " + String(logDebug));
+
+            // if loggging is set to false delete the existing file
+            if (!logDebug) {
+                deleteLogFile("/log.txt");
+            }
         }
 
         if (request->hasParam("logAccess", true)) {
@@ -490,7 +509,7 @@ void setupSettingsRoutes(AsyncWebServer &server) {
                 String output = sha256(pwd);
                 pref.putString("adminPwd", output);
 
-                logger("Admin password updated", "Device", LOG_WARNING);
+                logger("Admin password updated", "W");
             }
         }
 
@@ -563,7 +582,7 @@ void setupFileRoutes(AsyncWebServer &server) {
 
         }else {
 
-            logger("OTA Firmware update complete, restarting...", "Device", LOG_INFO);
+            logger("OTA Firmware update complete, restarting...", "Device");
 
             AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "OTA Firmware update successful! Rebooting...");
             response->addHeader("Connection", "close");
@@ -584,7 +603,7 @@ void setupFileRoutes(AsyncWebServer &server) {
 
         }else {
 
-            logger("OTA Filesystem update complete, restarting...", "Device", LOG_INFO);
+            logger("OTA Filesystem update complete, restarting...", "Device");
 
             AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "OTA Filesystem update successful! Rebooting...");
             response->addHeader("Connection", "close");
@@ -634,7 +653,6 @@ void setupApiRoutes(AsyncWebServer &server) {
         doc["version_hw"] = appConfig.hwRev;
         doc["sn"] = appConfig.serialNumber;
         doc["uptime"] = millis();
-        doc["freeHeap"] = ESP.getFreeHeap();
 
         serializeJson(doc, *response);
         request->send(response);
@@ -654,8 +672,6 @@ void setupApiRoutes(AsyncWebServer &server) {
         hw["version_hw"] = appConfig.hwRev;
         hw["sn"] = appConfig.serialNumber;
         hw["uptime"] = millis();
-        hw["restartReason"] = restartReasonString(esp_reset_reason());
-        hw["freeHeap"] = ESP.getFreeHeap();
 
         JsonDocument door;
         door["position_current"] = (int)(hoermannEngine->state->currentPosition * 100);
@@ -667,11 +683,9 @@ void setupApiRoutes(AsyncWebServer &server) {
         JsonDocument sensor;
         sensor["temperature"] = appConfig.temperature;
         sensor["humidity"] = appConfig.humidity;
-        sensor["pressure"] = appConfig.pressure;
         sensor["lux"] = appConfig.lux;
         sensor["thresholdTemp"] = appConfig.tempThreshold;
         sensor["thresholdHumidity"] = appConfig.humThreshold;
-        sensor["thresholdPressure"] = appConfig.presThreshold;
         sensor["thresholdLight"] = appConfig.luxThreshold;
         sensor["sensorUpdateInterval"] = appConfig.sensorUpdateInterval;
         sensor["tempUnit"] = appConfig.tempUnit;
@@ -683,7 +697,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         } else {
             sensor["externalSensor"] = "none";
         }
-        sensor["combineSensors"] = appConfig.combineSensors;
+
 
         JsonDocument settings;
         settings["name"] = appConfig.name;
@@ -692,7 +706,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         settings["buzzerTune"] = appConfig.buzzerTune;
         settings["buzzerOpening"] = appConfig.buzzerOpening;
         settings["buzzerClosing"] = appConfig.buzzerClosing;
-        settings["logLevel"] = appConfig.logLevel;
+        settings["logDebug"] = appConfig.logDebug;
         settings["logAccess"] = appConfig.logAccess;
         settings["useAuth"] = appConfig.useAuth;
         settings["setupDone"] = appConfig.setupDone;
@@ -735,9 +749,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         JsonDocument sensor;
         sensor["temperature"] = appConfig.temperature;
         sensor["humidity"] = appConfig.humidity;
-        sensor["pressure"] = appConfig.pressure;
         sensor["lux"] = appConfig.lux;
-        sensor["combineSensors"] = appConfig.combineSensors;
 
         // if exxternal sensor is set, add it to the response
         if (appConfig.externalSensorSet) {
@@ -852,8 +864,8 @@ void setupApiRoutes(AsyncWebServer &server) {
     });
 
     server.on("/api/log/debug", HTTP_GET, [](AsyncWebServerRequest *request) {
-        if (LittleFS.exists("/log.csv")) {
-            request->send(LittleFS, "/log.csv", "text/csv", true);
+        if (LittleFS.exists("/log.txt")) {
+            request->send(LittleFS, "/log.txt", "text/plain", true);
         } else {
             request->send(404, "text/plain", "Debug log file not found!");
         }
@@ -870,8 +882,8 @@ void setupApiRoutes(AsyncWebServer &server) {
     server.on("/api/log/debug", HTTP_DELETE, [](AsyncWebServerRequest *request) {
         if (!isAuthorized(request)) return;
 
-        deleteLogFile("/log.csv");
-        logger("Debug log file deleted by user", "Device", LOG_WARNING);
+        deleteLogFile("/log.txt");
+        logger("Debug log file deleted by user", "W");
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 
@@ -879,7 +891,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         if (!isAuthorized(request)) return;
 
         deleteLogFile("/log-access.txt");
-        logger("Access log file deleted by user", "Device", LOG_WARNING);
+        logger("Access log file deleted by user", "W");
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 
@@ -897,7 +909,7 @@ void setupApiRoutes(AsyncWebServer &server) {
     server.on("/api/reset", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (!isAuthorized(request)) return;
 
-        logger("Factory reset by user requested", "Device", LOG_WARNING);
+        logger("Factory reset by user requested", "W");
 
         nvs_flash_erase();
         nvs_flash_init();
@@ -912,7 +924,7 @@ void setupApiRoutes(AsyncWebServer &server) {
 
     server.on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request) {
         
-        logger("Restart by user requested", "Device", LOG_WARNING);
+        logger("Restart by user requested", "W");
         request->send(200, "application/json", "{\"status\":\"restarting\"}");
 
         request->onDisconnect([]() {
@@ -1016,7 +1028,7 @@ void routing(AsyncWebServer &server) {
 
     // map requests to static files
     server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html").setFilter(ON_STA_FILTER);
-    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+    server.serveStatic("/", LittleFS, "/");
     server.serveStatic("/settings", LittleFS, "/settings/").setDefaultFile("index.html");
 
     // captive portal mapping
@@ -1028,13 +1040,38 @@ void routing(AsyncWebServer &server) {
         req->send(response);
     });
 
+    // Android
+    server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *req) {
+        AsyncWebServerResponse *response = req->beginResponse(LittleFS, "/captive.html", "text/html");
+        response->addHeader("Cache-Control", "no-cache");
+        response->addHeader("Pragma", "no-cache");
+        response->addHeader("Expires", "-1");
+        req->send(response);
+    });
+
+    // Apple
+    server.on("/hotspot-detect.html", HTTP_GET, [](AsyncWebServerRequest *req) {
+        AsyncWebServerResponse *response = req->beginResponse(LittleFS, "/captive.html", "text/html");
+        response->addHeader("Cache-Control", "no-cache");
+        response->addHeader("Pragma", "no-cache");
+        response->addHeader("Expires", "-1");
+        req->send(response);
+    });
+
+    // Windows
+    server.on("/connecttest.txt", HTTP_GET, [](AsyncWebServerRequest *req) {
+        AsyncWebServerResponse *response = req->beginResponse(LittleFS, "/captive.html", "text/html");
+        response->addHeader("Cache-Control", "no-cache");
+        response->addHeader("Pragma", "no-cache");
+        response->addHeader("Expires", "-1");
+        req->send(response);
+    });
 
     // not found handler
     server.onNotFound([](AsyncWebServerRequest *request) {
-        
-        if (WiFi.getMode() & WIFI_AP && request->client()->remoteIP() != WiFi.softAPIP()) {
-            Serial.println("Redirecting to captive portal");
+        if (WiFi.getMode() & WIFI_AP && request->client()->localIP() == WiFi.softAPIP()) {
             request->redirect("/captive");
+            Serial.println("Redirecting to captive portal");
             return;
         }
 
@@ -1058,6 +1095,7 @@ void routing(AsyncWebServer &server) {
             request->send(LittleFS, path, String(), false);
         } else {
             request->redirect("/404");
+            // request->send(LittleFS, "/404.html", String(), false);
         }
     });
 }
