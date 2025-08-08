@@ -3,7 +3,9 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <time.h>
-#include <PubSubClient.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 
 #include "fs-helper.h"
 #include "config.h"
@@ -20,7 +22,6 @@ AppConfig appConfig;
 Preferences pref;
 AsyncWebServer server(80);
 AsyncEventSource events("/api/events");
-
 
 void initConfig() {
     
@@ -54,15 +55,17 @@ void initConfig() {
   appConfig.tempUnit = pref.getInt("tempUnit", PREF_TEMP_UNIT);
   appConfig.tempThreshold = pref.getFloat("thresholdTemp", PREF_THRESHOLD_TEMP);
   appConfig.humThreshold = pref.getInt("thresholdHum", PREF_THRESHOLD_HUM);
+  appConfig.presThreshold = pref.getInt("thresholdPres", PREF_THRESHOLD_PRES);
   appConfig.luxThreshold = pref.getInt("thresholdLux", PREF_THRESHOLD_LUX);
   appConfig.externalSensorSet = pref.getBool("extSensorSet", PREF_EXTERNAL_SENSOR);
   appConfig.externalSensor = pref.getInt("extSensor", PREF_EXTERNAL_SENSOR_TYPE);
+  appConfig.combineSensors = pref.getBool("combineSensors", PREF_COMBINE_SENSORS);
   appConfig.buzzerSet = pref.getBool("buzzerSet", PREF_BUZZER_SET);
   appConfig.buzzerTune = pref.getInt("buzzerTune", PREF_BUZZER_TUNE);
   appConfig.buzzerOpening = pref.getBool("buzzerOpening", PREF_BUZZER_OPENING);
   appConfig.buzzerClosing = pref.getBool("buzzerClosing", PREF_BUZZER_CLOSING);
   appConfig.logAccess = pref.getBool("logAccess", PREF_LOG_ACCESS);
-  appConfig.logDebug = pref.getBool("logDebug", PREF_LOG_DEBUG);
+  appConfig.logLevel = pref.getInt("logLevel", PREF_LOG_LVL);
   pref.end();
 
 
@@ -98,6 +101,7 @@ void initConfig() {
   // sensor init
   appConfig.temperature = 0;
   appConfig.humidity = 0;
+  appConfig.pressure = 0;
   appConfig.lux = 0;
   appConfig.extSensorData = "{}"; // empty JSON object
 }
@@ -148,12 +152,12 @@ void setup() {
     digitalWrite(RS_EN, LOW);
 
     hoermannEngine->setup();
-    logger("Garage Door:    ok", "BOOT");
+    logger("Garage Door: ok", "BOOT", LOG_INFO);
   }
 
 
   if (!appConfig.wifiSet) {
-      logger("WiFi not setup yet, starting AP Mode");
+      logger("WiFi not setup yet, starting AP Mode", "BOOT", LOG_INFO);
       setupWifiAp();
   } else {
       setupWifi();
@@ -163,7 +167,7 @@ void setup() {
   // Setup server sent events
   events.onConnect([](AsyncEventSourceClient* client) {
       client->send("Connected to PandaGarage SSE - Hello!", NULL, millis(), 1000);
-      logger("Client connected", "SSE");
+      logger("Client connected", "SSE", LOG_INFO);
   });
 
 
@@ -171,31 +175,33 @@ void setup() {
   routing(server);
   server.addHandler(&events);
   server.begin();
-  logger("HTTP Server:  ok", "BOOT");
+  logger("HTTP Server: ok", "BOOT", LOG_INFO);
   
 
   // start mqtt for Home Assistant
   if (appConfig.haSet) {
       if (mqttHaSetup()) {
           mqttHaReconnect();
+          initMqttTask();
       }
   }
 
   
   // setup sensors
   setupSensors();
-  logger("Sensors:      ok", "BOOT");
+  initSensorTask();
+  logger("Sensors: ok", "BOOT", LOG_INFO);
 
 
   // setup buzzer
   if (appConfig.buzzerSet) {
       setupBuzzer();
-      logger("Buzzer:       ok", "BOOT");
+      logger("Buzzer: ok", "BOOT", LOG_INFO);
   } else {
-      logger("Buzzer:       not set", "BOOT");
+      logger("Buzzer: not set", "BOOT", LOG_INFO);
   }
 
-  logger(String(appConfig.name) + " is ready!", "BOOT");
+  logger(String(appConfig.name) + " is ready!", "BOOT", LOG_INFO);
 }
 
 
@@ -206,13 +212,11 @@ void loop() {
     
     // check for garage door updates
     if (hoermannEngine->state->isValid() && hoermannEngine->state->changed) {
-      onDoorStateChanged(*hoermannEngine->state);
       hoermannEngine->state->clearChanged();
+      onDoorStateChanged(*hoermannEngine->state);      
     }
 
-    // loop mqtt and sensors
-    mqttHaLoop();
-    sensorLoop();
+    // sensor and buzzer handled in dedicated tasks
     buzzerLoop();
   }
 
@@ -233,7 +237,6 @@ void loop() {
     lastReportedPct = currentPct;
   }
 
-  // these are always running
   wifiLoop();
   delay(10);
 }

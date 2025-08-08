@@ -4,5 +4,3 @@
 .vscode/launch.json
 .vscode/ipch
 build
-debug
-scripts
