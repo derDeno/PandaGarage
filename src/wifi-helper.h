@@ -20,19 +20,27 @@ DNSServer dnsServer;
 IPAddress apIP(192, 1, 1, 1);
 
 static unsigned long lastAttemptTime = 0;
-const unsigned long reconnectInterval = 5000;
 unsigned long reconnectDelay = 1000;
 const unsigned long maxReconnectDelay = 60000;
+const unsigned long initialReconnectDelay = 1000;
 uint8_t connectionAttempts = 0;
-const uint8_t MAX_CONNECTION_ATTEMPTS = 5;
-const unsigned long WIFI_CONNECT_TIMEOUT_MS = 7000;
 
 bool scanInProgress = false;
 bool scanRequested  = false;
 bool testRequested  = false;
+bool wifiConnectInProgress = false;
+bool wifiApModeActive = false;
+bool wifiPrimaryEventHandlerRegistered = false;
+bool wifiServicesInitialized = false;
+bool wifiDisconnectLogged = false;
+bool wifiTestInProgress = false;
 
 std::vector<AsyncEventSourceClient*> scanClients;
 std::vector<AsyncEventSourceClient*> testClients;
+
+
+void beginWifiConnect();
+void WiFiEvent(WiFiEvent_t event);
 
 
 
@@ -65,38 +73,36 @@ void setupMDNS() {
 void setupWifi() {
 
     connectionAttempts = 0;
+    reconnectDelay = initialReconnectDelay;
+    lastAttemptTime = 0;
+    wifiApModeActive = false;
+    wifiServicesInitialized = false;
+    wifiDisconnectLogged = false;
 
     // Connect to Wi-Fi network
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
     WiFi.setHostname(appConfig.name);
     WiFi.setSleep(false);
-    WiFi.begin(appConfig.wifiSsid, appConfig.wifiPwd);
-    logger("Connecting to WiFi...", "BOOT", LOG_INFO);
 
-    // Wait for connection with timeout
-    auto status = WiFi.waitForConnectResult(WIFI_CONNECT_TIMEOUT_MS);
-
-    if (status != WL_CONNECTED) {
-        logger("WiFi connection failed!", "WiFi", LOG_ERROR);
-        connectionAttempts = MAX_CONNECTION_ATTEMPTS;
-        return;
+    if (!wifiPrimaryEventHandlerRegistered) {
+        WiFi.onEvent(WiFiEvent);
+        wifiPrimaryEventHandlerRegistered = true;
     }
 
-    // mDNS
-    setupMDNS();
-
-    // NTP
-    configTime(0, 0, "pool.ntp.org", "time.google.com", "time.cloudflare.com");
-    logger("NTP (UTC): ok", "BOOT", LOG_INFO);
-    logger("WiFI: ok", "BOOT", LOG_INFO);
-    logger("IP: " + WiFi.localIP().toString(), "BOOT", LOG_INFO);
+    beginWifiConnect();
 }
 
 
 
 // setup in AP Mode if no WiFi set
 void setupWifiAp() {
+    if (wifiApModeActive) {
+        return;
+    }
+
+    wifiApModeActive = true;
+    wifiConnectInProgress = false;
     WiFi.mode(WIFI_AP_STA);
     //WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
     WiFi.softAP("PandaGarage");    
@@ -133,6 +139,18 @@ void setupWifiAp() {
 
     server.addHandler(&sseScan);
     server.addHandler(&sseTest);
+}
+
+void beginWifiConnect() {
+    if (wifiConnectInProgress || wifiApModeActive) {
+        return;
+    }
+
+    wifiConnectInProgress = true;
+    lastAttemptTime = millis();
+    connectionAttempts++;
+    logger("Connecting to WiFi...", "BOOT", LOG_INFO);
+    WiFi.begin(appConfig.wifiSsid, appConfig.wifiPwd);
 }
 
 void startScan() {
@@ -185,23 +203,49 @@ void WiFiEvent(WiFiEvent_t event) {
     switch(event) {
       case SYSTEM_EVENT_STA_GOT_IP:
         logger("WiFi connection successful!", "WiFi", LOG_INFO);
-        deliverTestResults(true);
+        wifiConnectInProgress = false;
+        wifiDisconnectLogged = false;
+        connectionAttempts = 0;
+        reconnectDelay = initialReconnectDelay;
+        wifiApModeActive = false;
 
-        
-        // save the credentials
-        pref.begin("wifi");
-        pref.putString("ssid", appConfig.wifiSsidTest);
-        pref.putString("pwd", appConfig.wifiPwdTest);
-        pref.putBool("set", true);
-        pref.end();
+        if (!wifiServicesInitialized) {
+            setupMDNS();
+            configTime(0, 0, "pool.ntp.org", "time.google.com", "time.cloudflare.com");
+            logger("NTP (UTC): ok", "BOOT", LOG_INFO);
+            logger("WiFI: ok", "BOOT", LOG_INFO);
+            wifiServicesInitialized = true;
+        }
+
+        logger("IP: " + WiFi.localIP().toString(), "BOOT", LOG_INFO);
+        if (wifiTestInProgress) {
+            deliverTestResults(true);
+
+            // save the credentials
+            pref.begin("wifi");
+            pref.putString("ssid", appConfig.wifiSsidTest);
+            pref.putString("pwd", appConfig.wifiPwdTest);
+            pref.putBool("set", true);
+            pref.end();
+        }
 
 
+        wifiTestInProgress = false;
         testRequested  = false;
         break;
 
       case SYSTEM_EVENT_STA_DISCONNECTED:
-        logger("WiFi connection failed!", "WiFi", LOG_ERROR);
-        deliverTestResults(false);
+        wifiConnectInProgress = false;
+        wifiServicesInitialized = false;
+        if (!wifiDisconnectLogged) {
+            logger("WiFi connection lost!", "WiFi", LOG_WARNING);
+            wifiDisconnectLogged = true;
+        }
+        if (wifiTestInProgress) {
+            logger("WiFi connection failed!", "WiFi", LOG_ERROR);
+            deliverTestResults(false);
+        }
+        wifiTestInProgress = false;
         testRequested  = false;
         break;
 
@@ -215,8 +259,13 @@ void testWifiStaConnection() {
     
     logger("Testing credentials...", "WiFi", LOG_INFO);
 
+    if (!wifiPrimaryEventHandlerRegistered) {
+        WiFi.onEvent(WiFiEvent);
+        wifiPrimaryEventHandlerRegistered = true;
+    }
+
+    wifiTestInProgress = true;
     WiFi.begin(appConfig.wifiSsidTest, appConfig.wifiPwdTest);
-    WiFi.onEvent(WiFiEvent);
 }
 
 
@@ -230,30 +279,10 @@ void wifiLoop() {
         if (WiFi.status() != WL_CONNECTED) {
             unsigned long currentTime = millis();
 
-            if (currentTime - lastAttemptTime > reconnectDelay) {
-                lastAttemptTime = currentTime;
-                connectionAttempts++;
-                
-                if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
-                    logger("Attempting WiFi reconnection...", "WiFi", LOG_DEBUG);
-                    WiFi.disconnect();
-                    WiFi.reconnect();
-                    
-                } else {
-                    logger("Max connection attempts reached. Switching to AP mode.", "WiFi", LOG_ERROR);
-                    WiFi.disconnect();
-                    setupWifiAp();
-                }
-                
-                // Increase backoff delay for next attempt
+            if (!wifiConnectInProgress && currentTime - lastAttemptTime > reconnectDelay) {
+                logger("Attempting WiFi reconnection...", "WiFi", LOG_DEBUG);
+                beginWifiConnect();
                 reconnectDelay = min(reconnectDelay * 2, maxReconnectDelay);
-            }
-
-            if (millis() - lastAttemptTime > reconnectInterval) {
-                lastAttemptTime = millis();
-                logger("Lost WiFi connection. Attempting reconnect...", "WiFi", LOG_WARNING);
-                WiFi.disconnect();
-                WiFi.reconnect();
             }
         }
     } else {

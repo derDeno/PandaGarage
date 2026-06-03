@@ -939,13 +939,13 @@ void setupSetupRoutes(AsyncWebServer &server) {
         if (request->hasParam("name", true)) {
             const String name = request->getParam("name", true)->value();
             pref.putString("name", name);
-            strcpy(appConfig.name, name.c_str());
+            copyToBuffer(appConfig.name, name);
         }
 
         if (request->hasParam("lang", true)) {
             const String lang = request->getParam("lang", true)->value();
             pref.putString("lang", lang);
-            strcpy(appConfig.lang, lang.c_str());
+            copyToBuffer(appConfig.lang, lang);
         }
 
         pref.end();
@@ -961,12 +961,12 @@ void setupSetupRoutes(AsyncWebServer &server) {
         // get network details
         if (request->hasParam("ssid", true)) {
             String testSsid = request->getParam("ssid", true)->value();
-            strcpy(appConfig.wifiSsidTest, testSsid.c_str());
+            copyToBuffer(appConfig.wifiSsidTest, testSsid);
         }
 
         if (request->hasParam("pwd", true)) {
             String testPwd = request->getParam("pwd", true)->value();
-            strcpy(appConfig.wifiPwdTest, testPwd.c_str());
+            copyToBuffer(appConfig.wifiPwdTest, testPwd);
         }
 
         if (request->hasParam("bssid", true)) {

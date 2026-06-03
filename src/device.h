@@ -32,6 +32,9 @@ Adafruit_AHTX0 aht;
 Adafruit_CCS811 ccs;
 Adafruit_VL6180X vl;
 SensirionI2cScd4x scd4x;
+bool baseSensorAvailable = true;
+bool lightSensorAvailable = false;
+bool externalSensorAvailable = false;
 
 unsigned long lastBuzzerTime = 0;
 TaskHandle_t sensorTaskHandle = NULL;
@@ -140,20 +143,30 @@ void setupSensors() {
 
     #ifdef HW1
         hdc1080.begin(0x40);
+        baseSensorAvailable = true;
     #endif
 
     #ifdef HW2
         if (!bme.begin(0x76, &Wire)) {
             logger("Could not find a valid BME280 sensor, check wiring!", "Sensor", LOG_ERROR);
-            while (1);
+            baseSensorAvailable = false;
+        } else {
+            baseSensorAvailable = true;
         }
     #endif
 
-    lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, BH1750_I2CADDR, &Wire);
+    lightSensorAvailable = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, BH1750_I2CADDR, &Wire);
+    if (!lightSensorAvailable) {
+        logger("Could not initialize BH1750 light sensor", "Sensor", LOG_ERROR);
+    }
 
+    externalSensorAvailable = false;
     if (appConfig.externalSensorSet) {
         if (appConfig.externalSensor == 1) { // AHT10
-            aht.begin();
+            externalSensorAvailable = aht.begin();
+            if (!externalSensorAvailable) {
+                logger("Failed to start AHT10 sensor", "Sensor", LOG_ERROR);
+            }
 
         } else if (appConfig.externalSensor == 2) { // SCD40
             scd4x.begin(Wire, SCD40_I2C_ADDR_62);
@@ -161,6 +174,7 @@ void setupSensors() {
             scd4x.stopPeriodicMeasurement();
             scd4x.reinit();
             scd4x.startPeriodicMeasurement();
+            externalSensorAvailable = true;
 
         } else if (appConfig.externalSensor == 3) { // SCD41
             scd4x.begin(Wire, SCD41_I2C_ADDR_62);
@@ -168,56 +182,79 @@ void setupSensors() {
             scd4x.stopPeriodicMeasurement();
             scd4x.reinit();
             scd4x.startPeriodicMeasurement();
+            externalSensorAvailable = true;
 
         } else if (appConfig.externalSensor == 4) { // CCS811
             if(!ccs.begin()){
                 logger("Failed to start sensor! Please check your wiring.", "Sensor", LOG_ERROR);
-                while(1);
+            } else {
+                externalSensorAvailable = true;
             }
-            
-            // calibrate temperature sensor
-            while(!ccs.available());
-            float temp = ccs.calculateTemperature();
-            ccs.setTempOffset(temp - 25.0);
+
+            if (externalSensorAvailable) {
+                const unsigned long timeoutAt = millis() + 5000;
+                while (!ccs.available() && millis() < timeoutAt) {
+                    delay(10);
+                }
+
+                if (!ccs.available()) {
+                    logger("CCS811 timed out while waiting for first reading", "Sensor", LOG_ERROR);
+                    externalSensorAvailable = false;
+                } else {
+                    float temp = ccs.calculateTemperature();
+                    ccs.setTempOffset(temp - 25.0);
+                }
+            }
 
         } else if (appConfig.externalSensor == 5) { // VL6180X
             vl = Adafruit_VL6180X();
 
             if (!vl.begin()) {
                 logger("Failed to boot first VL6180X", "Sensor", LOG_ERROR);
-                while (1);
+            } else {
+                externalSensorAvailable = true;
+                vl.setAddress(0x30);
+                delay(10);
             }
-            vl.setAddress(0x30);
-            delay(10);
         }
     }
 }
 
 void sensorLoop() {
+    float temp = appConfig.temperature;
+    float humid = appConfig.humidity;
+    float pressure = appConfig.pressure;
+    float lux = appConfig.lux;
 
     #ifdef HW1
-        float temp = hdc1080.readTemperature();
-        float humid = hdc1080.readHumidity();
-        float pressure = 0;
+        if (baseSensorAvailable) {
+            temp = hdc1080.readTemperature();
+            humid = hdc1080.readHumidity();
+            pressure = 0;
+        }
     #endif
 
     #ifdef HW2
-        float temp = bme.readTemperature();
-        float humid = bme.readHumidity();
-        float pressure = bme.readPressure() / 100.0F; // convert to hPa
+        if (baseSensorAvailable) {
+            temp = bme.readTemperature();
+            humid = bme.readHumidity();
+            pressure = bme.readPressure() / 100.0F; // convert to hPa
+        }
     #endif
 
     // convert to fahrenheit if set so
     bool isCelsius = (appConfig.tempUnit == 0) ? true : false;
-    if (!isCelsius) {
+    if (baseSensorAvailable && !isCelsius) {
         temp = (temp * 9.0 / 5.0) + 32.0;
     }
 
-    float lux = lightMeter.readLightLevel();
+    if (lightSensorAvailable) {
+        lux = lightMeter.readLightLevel();
+    }
 
 
     // external sensors
-    if (appConfig.externalSensorSet) {
+    if (appConfig.externalSensorSet && externalSensorAvailable) {
         if (appConfig.externalSensor == 1) {  // AHT10
             
             sensors_event_t humidity, temperature;
@@ -407,7 +444,7 @@ void sensorLoop() {
 void sensorTask(void *parameter) {
     while (true) {
         sensorLoop();
-        vTaskDelay(appConfig.sensorUpdateInterval);
+        vTaskDelay(pdMS_TO_TICKS(appConfig.sensorUpdateInterval));
     }
 }
 
