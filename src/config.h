@@ -3,7 +3,7 @@
 */
 
 // System values
-#define VERSION "0.3.0"
+#define VERSION "0.3.2"
 #define RS_TXD 17
 #define RS_RXD 18
 #define RS_EN 16
@@ -26,7 +26,7 @@
 
 #define PREF_SENSOR_UPDATE_INTERVAL 10000 // 10 seconds
 
-#define PREF_BUZZER_SET false 
+#define PREF_BUZZER_SET false
 #define PREF_BUZZER_TUNE 0 // 0 = none, 1 = beep, 2 = alarm, 3 = melody
 #define PREF_BUZZER_OPENING false
 #define PREF_BUZZER_CLOSING false
@@ -100,3 +100,18 @@ struct AppConfig {
     float luxThreshold;             // lux threshold for changes
     bool combineSensors;            // combine sensors of same type (e.g. AHT10 and BME280) to average values
 };
+
+template <size_t N>
+void copyToBuffer(char (&dest)[N], const String& src) {
+    src.toCharArray(dest, N);
+}
+
+template <size_t N>
+void copyToBuffer(char (&dest)[N], const char* src) {
+    if (src == nullptr) {
+        dest[0] = '\0';
+        return;
+    }
+
+    snprintf(dest, N, "%s", src);
+}

@@ -130,14 +130,13 @@ class HoermannState {
         this->valid = isValid;
     }
 
-    // Function not used not clear if it make sense to use.
-    String isValid() {
-        // is valid if age between 0 and 2 second
-        if ((this->responseAge() > 0 && this->responseAge() < 2)) {
-            return "true";
-        } else {
-            return "false";
+    bool isValid() const {
+        if (!this->valid) {
+            return false;
         }
+
+        unsigned long age = millis() - this->lastModbusRespone;
+        return this->lastModbusRespone != 0 && age < 2000;
     }
 
     String toStatusJson() {
@@ -349,7 +348,7 @@ class HoermannGarageEngine {
 
         return val;
     }
-    
+
     /**
      * Write on 0x9D31+2 , byte1: current state
      */

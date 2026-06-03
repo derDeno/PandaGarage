@@ -17,6 +17,11 @@ bool mqttInitState = false;
 
 static const unsigned long GH_UPDATE_INTERVAL = 24UL * 60UL * 60UL * 1000UL;
 static unsigned long lastGhUpdateCheck = 0;
+static const unsigned long MQTT_RECONNECT_INITIAL_DELAY_MS = 1000;
+static const unsigned long MQTT_RECONNECT_MAX_DELAY_MS = 30000;
+static unsigned long mqttLastConnectAttempt = 0;
+static unsigned long mqttReconnectDelay = MQTT_RECONNECT_INITIAL_DELAY_MS;
+static bool mqttConnectInProgress = false;
 
 struct MqttMessage {
     char topic[MQTT_TOPIC_LEN];
@@ -57,7 +62,7 @@ void checkForFirmwareUpdate() {
         }
 
         const char* latestTag = res["tag_name"];
-        strcpy(appConfig.latestFw, latestTag);
+        copyToBuffer(appConfig.latestFw, latestTag);
 
         JsonDocument doc;
         doc["installed_version"] = VERSION;
@@ -493,6 +498,9 @@ void mqttHaListen(const char* topic, const char* payload, unsigned int length) {
 
 void onMqttConnect(bool sessionPresent) {
     logger("Connected to Home Assistant", "MQTT", LOG_DEBUG);
+    mqttConnectInProgress = false;
+    mqttLastConnectAttempt = millis();
+    mqttReconnectDelay = MQTT_RECONNECT_INITIAL_DELAY_MS;
 
     if(!configSent) {
         mqttHaConfig();
@@ -507,6 +515,7 @@ void onMqttConnect(bool sessionPresent) {
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
     logger("Disconnected from Home Assistant", "MQTT", LOG_WARNING);
     mqttInitState = false;
+    mqttConnectInProgress = false;
 }
 
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
@@ -518,32 +527,38 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 }
 
 
-int mqttHaReconnect() {
+bool mqttHaReconnect() {
     
     // check if wifi is connected
     if (WiFi.status() != WL_CONNECTED) {
-        return 0;
-    }
-
-    // if mqtt connected, disconnect first
-    if(mqttClientHa.connected()) {
-        mqttClientHa.disconnect();
-    }
-
-    mqttClientHa.connect();
-
-    int waitCount = 0;
-    while (!mqttClientHa.connected() && waitCount < 10) {
-        delay(500);
-        waitCount++;
+        mqttConnectInProgress = false;
+        return false;
     }
 
     if (mqttClientHa.connected()) {
-        return 1;
+        mqttConnectInProgress = false;
+        return true;
     }
 
-    logger("Failed to connect to HA MQTT", "MQTT", LOG_ERROR);
-    return 0;
+    if (mqttConnectInProgress) {
+        return false;
+    }
+
+    unsigned long now = millis();
+    if (mqttLastConnectAttempt != 0 && (now - mqttLastConnectAttempt) < mqttReconnectDelay) {
+        return false;
+    }
+
+    mqttLastConnectAttempt = now;
+    mqttConnectInProgress = true;
+    mqttClientHa.connect();
+
+    if (!mqttClientHa.connected()) {
+        logger("Starting HA MQTT reconnect attempt", "MQTT", LOG_DEBUG);
+        mqttReconnectDelay = min(mqttReconnectDelay * 2, MQTT_RECONNECT_MAX_DELAY_MS);
+    }
+
+    return false;
 }
 
 bool mqttHaSetup() {
@@ -567,6 +582,7 @@ void mqttHaLoop() {
 
     if (!mqttClientHa.connected()) {
         mqttHaReconnect();
+        return;
     }
 
     // send init mqtt state
@@ -577,6 +593,7 @@ void mqttHaLoop() {
         mqttHaPublish("/light/state", (hoermannEngine->state->lightOn ? "ON" : "OFF"), true);
 
         checkForFirmwareUpdate();
+        lastGhUpdateCheck = millis();
         mqttInitState = true;
     }
 
