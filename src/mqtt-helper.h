@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "config.h"
 
 #define MQTT_TOPIC_LEN 128
 #define MQTT_PAYLOAD_LEN 256
@@ -14,14 +15,12 @@ extern AppConfig appConfig;
 AsyncMqttClient mqttClientHa;
 bool configSent = false;
 bool mqttInitState = false;
+bool mqttConnectInProgress = false;
 
 static const unsigned long GH_UPDATE_INTERVAL = 24UL * 60UL * 60UL * 1000UL;
 static unsigned long lastGhUpdateCheck = 0;
-static const unsigned long MQTT_RECONNECT_INITIAL_DELAY_MS = 1000;
-static const unsigned long MQTT_RECONNECT_MAX_DELAY_MS = 30000;
-static unsigned long mqttLastConnectAttempt = 0;
-static unsigned long mqttReconnectDelay = MQTT_RECONNECT_INITIAL_DELAY_MS;
-static bool mqttConnectInProgress = false;
+static const unsigned long MQTT_RECONNECT_INTERVAL = 5000;
+static unsigned long nextMqttReconnectAttempt = 0;
 
 struct MqttMessage {
     char topic[MQTT_TOPIC_LEN];
@@ -37,6 +36,7 @@ void initMqttTask();
 void onMqttConnect(bool sessionPresent);
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason);
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
+bool mqttHaReconnect();
 
 
 void checkForFirmwareUpdate() {
@@ -57,12 +57,14 @@ void checkForFirmwareUpdate() {
         JsonDocument res;
         auto err = deserializeJson(res, payload);
         if (err) {
+#if DEBUG
             Serial.printf("JSON parse failed: %s\n", err.c_str());
+#endif
             return;
         }
 
-        const char* latestTag = res["tag_name"];
-        copyToBuffer(appConfig.latestFw, latestTag);
+        const char* latestTag = res["tag_name"] | "";
+        copyCStringToBuffer(appConfig.latestFw, latestTag);
 
         JsonDocument doc;
         doc["installed_version"] = VERSION;
@@ -106,7 +108,9 @@ void mqttHaPublish(const char* topic, const char* payload, bool retain) {
         strncpy(msg.payload, payload, MQTT_PAYLOAD_LEN - 1);
         msg.payload[MQTT_PAYLOAD_LEN - 1] = '\0';
         msg.retain = retain;
-        xQueueSend(mqttQueue, &msg, 0);
+        if (xQueueSend(mqttQueue, &msg, 0) != pdPASS) {
+            logger("MQTT queue full, dropping message for " + fullTopic, "MQTT", LOG_WARNING);
+        }
     }
 }
 
@@ -133,7 +137,8 @@ void mqttHaInitState() {
 
     if (appConfig.externalSensorSet) {
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, appConfig.extSensorData);
+        String extSensorData = getExtSensorData();
+        DeserializationError error = deserializeJson(doc, extSensorData);
 
         if (error) {
             logger("Failed to deserialize external sensor data: " + String(error.c_str()), "MQTT", LOG_ERROR);
@@ -497,10 +502,9 @@ void mqttHaListen(const char* topic, const char* payload, unsigned int length) {
 }
 
 void onMqttConnect(bool sessionPresent) {
-    logger("Connected to Home Assistant", "MQTT", LOG_DEBUG);
     mqttConnectInProgress = false;
-    mqttLastConnectAttempt = millis();
-    mqttReconnectDelay = MQTT_RECONNECT_INITIAL_DELAY_MS;
+    nextMqttReconnectAttempt = 0;
+    logger("Connected to Home Assistant", "MQTT", LOG_DEBUG);
 
     if(!configSent) {
         mqttHaConfig();
@@ -516,6 +520,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
     logger("Disconnected from Home Assistant", "MQTT", LOG_WARNING);
     mqttInitState = false;
     mqttConnectInProgress = false;
+    nextMqttReconnectAttempt = millis() + MQTT_RECONNECT_INTERVAL;
 }
 
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
@@ -528,8 +533,6 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 
 
 bool mqttHaReconnect() {
-    
-    // check if wifi is connected
     if (WiFi.status() != WL_CONNECTED) {
         mqttConnectInProgress = false;
         return false;
@@ -540,24 +543,15 @@ bool mqttHaReconnect() {
         return true;
     }
 
-    if (mqttConnectInProgress) {
-        return false;
-    }
-
     unsigned long now = millis();
-    if (mqttLastConnectAttempt != 0 && (now - mqttLastConnectAttempt) < mqttReconnectDelay) {
+    if (mqttConnectInProgress || (nextMqttReconnectAttempt != 0 && now < nextMqttReconnectAttempt)) {
         return false;
     }
 
-    mqttLastConnectAttempt = now;
     mqttConnectInProgress = true;
+    nextMqttReconnectAttempt = now + MQTT_RECONNECT_INTERVAL;
+    logger("Attempting MQTT reconnect", "MQTT", LOG_INFO);
     mqttClientHa.connect();
-
-    if (!mqttClientHa.connected()) {
-        logger("Starting HA MQTT reconnect attempt", "MQTT", LOG_DEBUG);
-        mqttReconnectDelay = min(mqttReconnectDelay * 2, MQTT_RECONNECT_MAX_DELAY_MS);
-    }
-
     return false;
 }
 
@@ -593,7 +587,6 @@ void mqttHaLoop() {
         mqttHaPublish("/light/state", (hoermannEngine->state->lightOn ? "ON" : "OFF"), true);
 
         checkForFirmwareUpdate();
-        lastGhUpdateCheck = millis();
         mqttInitState = true;
     }
 
@@ -616,7 +609,7 @@ void mqttTask(void *parameter) {
                 mqttClientHa.publish(msg.topic, 0, msg.retain, msg.payload);
             }
         }
-        vTaskDelay(2000);
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
 

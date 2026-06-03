@@ -5,6 +5,7 @@
 #include <esp_efuse.h>
 #include <esp_partition.h>
 #include <esp_core_dump.h>
+#include "config.h"
 
 /**
  * Read the version from the filesystem
@@ -14,7 +15,9 @@
 void readFsVersion(char* versionBuffer, size_t bufferSize) {
     File versionFile = LittleFS.open("/version.txt", "r");
     if (!versionFile) {
+#if DEBUG
         Serial.println("Failed to open FS version file");
+#endif
         versionBuffer[0] = '\0';
         return;
     }
@@ -38,14 +41,20 @@ void readFsVersion(char* versionBuffer, size_t bufferSize) {
  */
 void initFs() {
     if (!LittleFS.begin()) {
+        #if DEBUG
         Serial.write("LittleFS mount failed, formatting... \n");
+        #endif
         LittleFS.format();
 
     } else if (!LittleFS.exists("/version.txt")) {
+#if DEBUG
         Serial.println("Version file missing");
+#endif
 
     } else {
+#if DEBUG
         Serial.println("Filesystem mounted.");
+#endif
     }
 }
 
@@ -68,7 +77,9 @@ void getEfuseData(char*& serial, char*& revision) {
     uint8_t raw[17] = {0};
     esp_err_t err = esp_efuse_read_field_blob(CUSTOM_BLOCK3_FIELD, raw, 136);
     if (err != ESP_OK) {
+#if DEBUG
         Serial.println("eFuse: Failed to read: " + String(esp_err_to_name(err)));
+#endif
         serial = (char*)"n/a";
         revision = (char*)"n/a";
         return;
@@ -83,6 +94,8 @@ void getEfuseData(char*& serial, char*& revision) {
         *delimiter = '\0';
         strncpy(serialBuf, efuseString, sizeof(serialBuf) - 1);
         strncpy(revisionBuf, delimiter + 1, sizeof(revisionBuf) - 1);
+        serialBuf[sizeof(serialBuf) - 1] = '\0';
+        revisionBuf[sizeof(revisionBuf) - 1] = '\0';
         serial = serialBuf;
         revision = revisionBuf;
     } else {

@@ -1,7 +1,9 @@
 #include <Update.h>
 #include <nvs_flash.h>
 #include <base64.h>
+#include <time.h>
 #include "mbedtls/sha256.h"
+#include "config.h"
 
 extern AsyncEventSource events;
 extern Preferences pref;
@@ -71,6 +73,7 @@ String processorInfo(const String &var) {
         return uptime;
 
     } else if (var == "TEMPLATE_LOCAL_TIME") {
+        struct tm timeinfo;
         getLocalTime(&timeinfo);
 
         char timeStr[64];
@@ -164,7 +167,9 @@ void handleOtaFw(AsyncWebServerRequest *request, const String &filename, size_t 
         } else {
             totalSize += len;
             int progress = (totalSize * 100) / request->contentLength();
+            #if DEBUG
             Serial.println("OTA Firmware progress: " + String(progress) + "%");
+            #endif
             events.send(String(progress).c_str(), "ota-progress", millis());
 
             // if mqtt is connected, publish progress
@@ -217,7 +222,9 @@ void handleOtaFs(AsyncWebServerRequest *request, const String &filename, size_t 
         } else {
             totalSize += len;
             int progress = (totalSize * 100) / request->contentLength();
+            #if DEBUG
             Serial.println("OTA Filesystem progress: " + String(progress) + "%");
+            #endif
             events.send(String(progress).c_str(), "ota-progress", millis());
         }
     }
@@ -390,7 +397,9 @@ void setupSettingsRoutes(AsyncWebServer &server) {
             }
 
             pref.putBool("logAccess", logAccess);
+            #if DEBUG
             Serial.println("Access logging: " + String(logAccess));
+            #endif
 
             // if loggging is set to false delete the existing file
             if (!logAccess) {
@@ -679,7 +688,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         // if external sensor is set, add it to the response
         if (appConfig.externalSensorSet) {
             sensor["externalSensor"] = appConfig.externalSensor;
-            sensor["extSensorData"] = appConfig.extSensorData;
+            sensor["extSensorData"] = getExtSensorData();
         } else {
             sensor["externalSensor"] = "none";
         }
@@ -742,7 +751,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         // if exxternal sensor is set, add it to the response
         if (appConfig.externalSensorSet) {
             sensor["externalSensor"] = appConfig.externalSensor;
-            sensor["extSensorData"] = appConfig.extSensorData;
+            sensor["extSensorData"] = getExtSensorData();
         } else {
             sensor["externalSensor"] = "none";
         }
@@ -939,13 +948,13 @@ void setupSetupRoutes(AsyncWebServer &server) {
         if (request->hasParam("name", true)) {
             const String name = request->getParam("name", true)->value();
             pref.putString("name", name);
-            copyToBuffer(appConfig.name, name);
+            copyStringToBuffer(appConfig.name, name);
         }
 
         if (request->hasParam("lang", true)) {
             const String lang = request->getParam("lang", true)->value();
             pref.putString("lang", lang);
-            copyToBuffer(appConfig.lang, lang);
+            copyStringToBuffer(appConfig.lang, lang);
         }
 
         pref.end();
@@ -961,12 +970,12 @@ void setupSetupRoutes(AsyncWebServer &server) {
         // get network details
         if (request->hasParam("ssid", true)) {
             String testSsid = request->getParam("ssid", true)->value();
-            copyToBuffer(appConfig.wifiSsidTest, testSsid);
+            copyStringToBuffer(appConfig.wifiSsidTest, testSsid);
         }
 
         if (request->hasParam("pwd", true)) {
             String testPwd = request->getParam("pwd", true)->value();
-            copyToBuffer(appConfig.wifiPwdTest, testPwd);
+            copyStringToBuffer(appConfig.wifiPwdTest, testPwd);
         }
 
         if (request->hasParam("bssid", true)) {
@@ -1033,7 +1042,9 @@ void routing(AsyncWebServer &server) {
     server.onNotFound([](AsyncWebServerRequest *request) {
         
         if (WiFi.getMode() & WIFI_AP && request->client()->remoteIP() != WiFi.softAPIP()) {
+            #if DEBUG
             Serial.println("Redirecting to captive portal");
+            #endif
             request->redirect("/captive");
             return;
         }
