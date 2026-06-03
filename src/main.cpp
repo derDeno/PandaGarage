@@ -24,11 +24,11 @@ AsyncWebServer server(80);
 AsyncEventSource events("/api/events");
 
 void initConfig() {
-
+    
   // FS Version
   char versionBuffer[13];
   readFsVersion(versionBuffer, sizeof(versionBuffer));
-  copyToBuffer(appConfig.versionFs, versionBuffer);
+  copyCStringToBuffer(appConfig.versionFs, versionBuffer);
 
   // efuse data
   char* serialNumber;
@@ -49,8 +49,8 @@ void initConfig() {
       pref.putString("name", boardName);
   }
 
-  copyToBuffer(appConfig.name, pref.getString("name", boardName));
-  copyToBuffer(appConfig.lang, pref.getString("lang", "en"));
+  copyStringToBuffer(appConfig.name, pref.getString("name", boardName));
+  copyStringToBuffer(appConfig.lang, pref.getString("lang", "en"));
   appConfig.sensorUpdateInterval = pref.getInt("sensorInterval", PREF_SENSOR_UPDATE_INTERVAL);
   appConfig.tempUnit = pref.getInt("tempUnit", PREF_TEMP_UNIT);
   appConfig.tempThreshold = pref.getFloat("thresholdTemp", PREF_THRESHOLD_TEMP);
@@ -71,17 +71,17 @@ void initConfig() {
 
   pref.begin("haSettings", true);
   appConfig.haSet = pref.getBool("activate", false);
-  copyToBuffer(appConfig.haIp, pref.getString("ip", ""));
+  copyStringToBuffer(appConfig.haIp, pref.getString("ip", ""));
   appConfig.haPort = pref.getInt("port", 1883);
-  copyToBuffer(appConfig.haUser, pref.getString("user", ""));
-  copyToBuffer(appConfig.haPwd, pref.getString("pwd", ""));
+  copyStringToBuffer(appConfig.haUser, pref.getString("user", ""));
+  copyStringToBuffer(appConfig.haPwd, pref.getString("pwd", ""));
   pref.end();
 
 
   pref.begin("wifi", true);
   appConfig.wifiSet = pref.getBool("set", false);
-  copyToBuffer(appConfig.wifiSsid, pref.getString("ssid", ""));
-  copyToBuffer(appConfig.wifiPwd, pref.getString("pwd", ""));
+  copyStringToBuffer(appConfig.wifiSsid, pref.getString("ssid", ""));
+  copyStringToBuffer(appConfig.wifiPwd, pref.getString("pwd", ""));
   pref.end();
 
 
@@ -95,7 +95,7 @@ void initConfig() {
       stored = sha256(PREF_ADMIN_PASSWORD);
       pref.putString("adminPwd", stored);
   }
-  copyToBuffer(appConfig.adminPwd, stored);
+  copyStringToBuffer(appConfig.adminPwd, stored);
   pref.end();
 
   // sensor init
@@ -103,7 +103,7 @@ void initConfig() {
   appConfig.humidity = 0;
   appConfig.pressure = 0;
   appConfig.lux = 0;
-  appConfig.extSensorData = "{}"; // empty JSON object
+  setExtSensorData("{}"); // empty JSON object
 }
 
 
@@ -113,7 +113,7 @@ void onDoorStateChanged(const HoermannState &s) {
   mqttHaPublish("/cover/position", String((s.currentPosition * 100)).c_str(), true);
   mqttHaPublish("/cover/state", String(s.coverState).c_str(), true);
   mqttHaPublish("/light/state", (s.lightOn ? "ON" : "OFF"), false);
-
+  
 
   // publish to server sent events in same format as api status for compatibility
   JsonDocument door;
@@ -176,7 +176,7 @@ void setup() {
   server.addHandler(&events);
   server.begin();
   logger("HTTP Server: ok", "BOOT", LOG_INFO);
-
+  
 
   // start mqtt for Home Assistant
   if (appConfig.haSet) {
@@ -186,7 +186,7 @@ void setup() {
       }
   }
 
-
+  
   // setup sensors
   setupSensors();
   initSensorTask();
@@ -209,11 +209,11 @@ void loop() {
 
   // was setup done?
   if (appConfig.setupDone && !updateInProgress) {
-
+    
     // check for garage door updates
     if (hoermannEngine->state->isValid() && hoermannEngine->state->changed) {
       hoermannEngine->state->clearChanged();
-      onDoorStateChanged(*hoermannEngine->state);
+      onDoorStateChanged(*hoermannEngine->state);      
     }
 
     // sensor and buzzer handled in dedicated tasks

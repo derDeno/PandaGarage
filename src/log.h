@@ -5,18 +5,28 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include <string.h>
+#include <time.h>
+#include "config.h"
 
 #define LOG_MSG_LEN 128
 
-struct tm timeinfo;
 const size_t MAX_LOG_FILE_SIZE = 50 * 1024;  // 50 KB
 extern AppConfig appConfig;
 
 QueueHandle_t logQueue = NULL;
 TaskHandle_t logTaskHandle = NULL;
 
+// keep track of log file sizes to avoid checking the filesystem on each log
+const TickType_t LOG_TRIM_INTERVAL = pdMS_TO_TICKS(60000);  // periodic trim check
+size_t logCsvSize = 0;
+size_t logAccessSize = 0;
+TickType_t lastTrimCsv = 0;
+TickType_t lastTrimAccess = 0;
+
 struct LogMessage {
     const char *fileName;
+    time_t timestamp;
     char data[LOG_MSG_LEN];
 };
 
@@ -58,7 +68,9 @@ String escapeCSVField(const String &field) {
 void checkLogFileSize(const char *fileName) {
     File logFile = LittleFS.open(fileName, "r");
     if (!logFile) {
+#if DEBUG
         Serial.println("Failed to open log file for reading");
+#endif
         return;
     }
 
@@ -91,9 +103,13 @@ void checkLogFileSize(const char *fileName) {
         if (logFile) {
             logFile.print(newContent);
             logFile.close();
+#if DEBUG
             Serial.println("Log file trimmed successfully");
+#endif
         } else {
+#if DEBUG
             Serial.println("Failed to open log file for writing");
+#endif
         }
     }
 }
@@ -101,17 +117,78 @@ void checkLogFileSize(const char *fileName) {
 
 void logTask(void *parameter) {
     LogMessage msg;
+
+    // initialize file size tracking
+    File logFile = LittleFS.open("/log.csv", "r");
+    if (logFile) {
+        logCsvSize = logFile.size();
+        logFile.close();
+    }
+    logFile = LittleFS.open("/log-access.txt", "r");
+    if (logFile) {
+        logAccessSize = logFile.size();
+        logFile.close();
+    }
+    lastTrimCsv = xTaskGetTickCount();
+    lastTrimAccess = lastTrimCsv;
+
     while (true) {
         if (xQueueReceive(logQueue, &msg, portMAX_DELAY) == pdPASS) {
-            checkLogFileSize(msg.fileName);
-            File logFile = LittleFS.open(msg.fileName, "a");
-            if (logFile) {
-                logFile.println(msg.data);
-                logFile.close();
+            struct tm timeinfo_local;
+            char timeStringBuff[25];
+            if (localtime_r(&msg.timestamp, &timeinfo_local)) {
+                strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%d %H:%M:%S", &timeinfo_local);
+            } else {
+                strncpy(timeStringBuff, "1970-01-01 00:00:00", sizeof(timeStringBuff));
+                timeStringBuff[sizeof(timeStringBuff) - 1] = '\0';
             }
+
+            String finalMessage;
+            if (strcmp(msg.fileName, "/log-access.txt") == 0) {
+                finalMessage = String("[") + timeStringBuff + "] - " + msg.data;
+            } else {
+                finalMessage = String(timeStringBuff) + ";" + msg.data;
+            }
+
+            size_t msgLen = finalMessage.length() + 1;  // include newline
+            TickType_t now = xTaskGetTickCount();
+
+            size_t *fileSize;
+            TickType_t *lastTrim;
+            if (strcmp(msg.fileName, "/log-access.txt") == 0) {
+                fileSize = &logAccessSize;
+                lastTrim = &lastTrimAccess;
+            } else {
+                fileSize = &logCsvSize;
+                lastTrim = &lastTrimCsv;
+            }
+
+            if ((*fileSize + msgLen > MAX_LOG_FILE_SIZE) ||
+                (now - *lastTrim > LOG_TRIM_INTERVAL)) {
+                checkLogFileSize(msg.fileName);
+                logFile = LittleFS.open(msg.fileName, "r");
+                if (logFile) {
+                    *fileSize = logFile.size();
+                    logFile.close();
+                } else {
+                    *fileSize = 0;
+                }
+                *lastTrim = now;
+            }
+
+            logFile = LittleFS.open(msg.fileName, "a");
+            if (logFile) {
+                logFile.println(finalMessage);
+                logFile.close();
+                *fileSize += msgLen;
+            }
+#if DEBUG
+            Serial.println(msg.data);
+#endif
         }
     }
 }
+
 
 void initLogger() {
     if (logQueue == NULL) {
@@ -122,35 +199,27 @@ void initLogger() {
 
 // log data to serial and file
 void logger(String logData, String tag = "", LOG_LVL level = LOG_DEBUG) {
-    // if false, no serial output to reduce load
-    if (DEBUG) {
-        Serial.println(logData);
-    }
-
-    // skip logging if the level is lower than the configured log level
-    if (level < appConfig.logLevel) {
+    // skip logging if the provided level is lower than the configured log level or the configured is 0
+    if (level < appConfig.logLevel || appConfig.logLevel == LOG_NONE) {
         return;
-    }
-
-    char timeStringBuff[25];
-    if (getLocalTime(&timeinfo, 0)) {
-        strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%d %H:%M:%S", &timeinfo);
-    } else {
-        strncpy(timeStringBuff, "1970-01-01 00:00:00", sizeof(timeStringBuff));
-        timeStringBuff[sizeof(timeStringBuff) - 1] = '\0';
     }
 
     // create the log in csv format. time;lvl;tag;data
     String escaped = escapeCSVField(logData);
-    String message = String(timeStringBuff) + ";" + level + ";" + tag + ";" + escaped;
+    String message = String(level) + ";" + tag + ";" + escaped;
 
     // logging set to true so log to file using background task
     if (logQueue != NULL) {
         LogMessage msg;
         msg.fileName = "/log.csv";
+        msg.timestamp = time(nullptr);
         strncpy(msg.data, message.c_str(), LOG_MSG_LEN - 1);
         msg.data[LOG_MSG_LEN - 1] = '\0';
-        xQueueSend(logQueue, &msg, 0);
+        if (xQueueSend(logQueue, &msg, 0) != pdPASS) {
+#if DEBUG
+            Serial.println("Log queue full, dropping debug log");
+#endif
+        }
     }
 }
 
@@ -161,22 +230,18 @@ void loggerAccess(String logData, String source) {
         return;
     }
 
-    char timeStringBuff[25];
-    if (getLocalTime(&timeinfo, 0)) {
-        strftime(timeStringBuff, sizeof(timeStringBuff), "[%Y-%m-%d %H:%M:%S]", &timeinfo);
-    } else {
-        strncpy(timeStringBuff, "[1970-01-01 00:00:00]", sizeof(timeStringBuff));
-        timeStringBuff[sizeof(timeStringBuff) - 1] = '\0';
-    }
-
-    String logMessage = String(timeStringBuff);
-    logMessage += " - [" + source + "] - " + logData;
+    String logMessage = "[" + source + "] - " + logData;
     if (logQueue != NULL) {
         LogMessage msg;
         msg.fileName = "/log-access.txt";
+        msg.timestamp = time(nullptr);
         strncpy(msg.data, logMessage.c_str(), LOG_MSG_LEN - 1);
         msg.data[LOG_MSG_LEN - 1] = '\0';
-        xQueueSend(logQueue, &msg, 0);
+        if (xQueueSend(logQueue, &msg, 0) != pdPASS) {
+#if DEBUG
+            Serial.println("Log queue full, dropping access log");
+#endif
+        }
     }
 }
 

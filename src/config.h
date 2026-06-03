@@ -2,6 +2,13 @@
 * App Config holds all relevant config values for the application.
 */
 
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+
 // System values
 #define VERSION "0.3.2"
 #define RS_TXD 17
@@ -11,7 +18,7 @@
 #define I2C_SCL 12
 #define BUZZER_PIN 3
 #define BTN_PIN 0
-#define DEBUG false // set this to true if you want serial output. false to reduce load in production
+#define DEBUG 0 // set to 1 if you want serial output; 0 to reduce load in production
 
 // Default Pref values
 #define PREF_TEMP_UNIT 0 // 0 = Celsius, 1 = Fahrenheit
@@ -26,7 +33,7 @@
 
 #define PREF_SENSOR_UPDATE_INTERVAL 10000 // 10 seconds
 
-#define PREF_BUZZER_SET false
+#define PREF_BUZZER_SET false 
 #define PREF_BUZZER_TUNE 0 // 0 = none, 1 = beep, 2 = alarm, 3 = melody
 #define PREF_BUZZER_OPENING false
 #define PREF_BUZZER_CLOSING false
@@ -62,7 +69,7 @@ struct AppConfig {
     bool buzzerOpening;         // is buzzer opening enabled
     bool buzzerClosing;         // is buzzer closing enabled
     bool logAccess;             // logging active
-    uint8_t logLevel;           // logging level (0 = debug, 1 = info, 2 = warning, 3 = error)
+    uint8_t logLevel;           // logging level (0 = none, 1 = debug, 2 = info, 3 = warning, 4 = error)
 
 
     // security settings
@@ -101,17 +108,46 @@ struct AppConfig {
     bool combineSensors;            // combine sensors of same type (e.g. AHT10 and BME280) to average values
 };
 
-template <size_t N>
-void copyToBuffer(char (&dest)[N], const String& src) {
-    src.toCharArray(dest, N);
+extern AppConfig appConfig;
+
+SemaphoreHandle_t getAppConfigMutex() {
+    static SemaphoreHandle_t appConfigMutex = xSemaphoreCreateMutex();
+    return appConfigMutex;
 }
 
 template <size_t N>
-void copyToBuffer(char (&dest)[N], const char* src) {
+void copyStringToBuffer(char (&dest)[N], const String& src) {
+    if (N == 0) {
+        return;
+    }
+
+    src.toCharArray(dest, N);
+    dest[N - 1] = '\0';
+}
+
+template <size_t N>
+void copyCStringToBuffer(char (&dest)[N], const char* src) {
     if (src == nullptr) {
         dest[0] = '\0';
         return;
     }
 
-    snprintf(dest, N, "%s", src);
+    copyStringToBuffer(dest, String(src));
 }
+
+void setExtSensorData(const String& value) {
+    SemaphoreHandle_t mutex = getAppConfigMutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    appConfig.extSensorData = value;
+    xSemaphoreGive(mutex);
+}
+
+String getExtSensorData() {
+    SemaphoreHandle_t mutex = getAppConfigMutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    String value = appConfig.extSensorData;
+    xSemaphoreGive(mutex);
+    return value;
+}
+
+#endif // CONFIG_H

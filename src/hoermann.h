@@ -110,7 +110,7 @@ class HoermannState {
         this->debMessage = false;
         this->debugMessage = "Initial";
     }
-    long responseAge() {
+    long responseAge() const {
         if (this->lastModbusRespone == 0) {
             return -1;
         }
@@ -130,13 +130,10 @@ class HoermannState {
         this->valid = isValid;
     }
 
+    // Function not used not clear if it make sense to use.
     bool isValid() const {
-        if (!this->valid) {
-            return false;
-        }
-
-        unsigned long age = millis() - this->lastModbusRespone;
-        return this->lastModbusRespone != 0 && age < 2000;
+        long age = this->responseAge();
+        return age >= 0 && age < 2;
     }
 
     String toStatusJson() {
@@ -176,7 +173,7 @@ class HoermannState {
                 return "stopped";
         }
     }
-    String translateCoverState(State stateCode) {
+    String translateCoverState(State stateCode) const {
         switch (stateCode) {
             case State::OPENING:
                 return "opening";
@@ -215,7 +212,7 @@ class HoermannGarageEngine {
     void setup() {
 
         RS485.begin(57600, SERIAL_8E1, RS_RXD, RS_TXD);
-        mb.begin(&RS485, RS_EN);
+        mb.begin(&RS485, RS_EN, true);
         mb.slave(SLAVE_ID);
 
         xTaskCreatePinnedToCore(
@@ -254,6 +251,7 @@ class HoermannGarageEngine {
 
     void handleModbus() {
         mb.task();
+        yield();
     }
 
     /**
@@ -348,7 +346,7 @@ class HoermannGarageEngine {
 
         return val;
     }
-
+    
     /**
      * Write on 0x9D31+2 , byte1: current state
      */

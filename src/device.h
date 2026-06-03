@@ -32,12 +32,11 @@ Adafruit_AHTX0 aht;
 Adafruit_CCS811 ccs;
 Adafruit_VL6180X vl;
 SensirionI2cScd4x scd4x;
-bool baseSensorAvailable = true;
-bool lightSensorAvailable = false;
-bool externalSensorAvailable = false;
 
 unsigned long lastBuzzerTime = 0;
 TaskHandle_t sensorTaskHandle = NULL;
+bool baseSensorAvailable = true;
+bool externalSensorAvailable = false;
 void sensorTask(void *parameter);
 void initSensorTask();
 unsigned long tuneDuration(int tune) {
@@ -141,31 +140,27 @@ void setupSensors() {
     Wire.setClock(400000);
     delay(200);
 
+    baseSensorAvailable = true;
+    externalSensorAvailable = !appConfig.externalSensorSet;
+
     #ifdef HW1
         hdc1080.begin(0x40);
-        baseSensorAvailable = true;
     #endif
 
     #ifdef HW2
         if (!bme.begin(0x76, &Wire)) {
             logger("Could not find a valid BME280 sensor, check wiring!", "Sensor", LOG_ERROR);
             baseSensorAvailable = false;
-        } else {
-            baseSensorAvailable = true;
         }
     #endif
 
-    lightSensorAvailable = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, BH1750_I2CADDR, &Wire);
-    if (!lightSensorAvailable) {
-        logger("Could not initialize BH1750 light sensor", "Sensor", LOG_ERROR);
-    }
+    lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, BH1750_I2CADDR, &Wire);
 
-    externalSensorAvailable = false;
     if (appConfig.externalSensorSet) {
         if (appConfig.externalSensor == 1) { // AHT10
             externalSensorAvailable = aht.begin();
             if (!externalSensorAvailable) {
-                logger("Failed to start AHT10 sensor", "Sensor", LOG_ERROR);
+                logger("Failed to start AHT10 sensor, continuing without it.", "Sensor", LOG_ERROR);
             }
 
         } else if (appConfig.externalSensor == 2) { // SCD40
@@ -186,23 +181,19 @@ void setupSensors() {
 
         } else if (appConfig.externalSensor == 4) { // CCS811
             if(!ccs.begin()){
-                logger("Failed to start sensor! Please check your wiring.", "Sensor", LOG_ERROR);
+                logger("Failed to start CCS811 sensor, continuing without it.", "Sensor", LOG_ERROR);
             } else {
                 externalSensorAvailable = true;
-            }
-
-            if (externalSensorAvailable) {
-                const unsigned long timeoutAt = millis() + 5000;
-                while (!ccs.available() && millis() < timeoutAt) {
+                unsigned long startedAt = millis();
+                while (!ccs.available() && millis() - startedAt < 2000) {
                     delay(10);
                 }
 
-                if (!ccs.available()) {
-                    logger("CCS811 timed out while waiting for first reading", "Sensor", LOG_ERROR);
-                    externalSensorAvailable = false;
-                } else {
+                if (ccs.available()) {
                     float temp = ccs.calculateTemperature();
                     ccs.setTempOffset(temp - 25.0);
+                } else {
+                    logger("CCS811 did not become ready in time, skipping calibration.", "Sensor", LOG_WARNING);
                 }
             }
 
@@ -210,13 +201,19 @@ void setupSensors() {
             vl = Adafruit_VL6180X();
 
             if (!vl.begin()) {
-                logger("Failed to boot first VL6180X", "Sensor", LOG_ERROR);
+                logger("Failed to boot VL6180X, continuing without it.", "Sensor", LOG_ERROR);
             } else {
                 externalSensorAvailable = true;
                 vl.setAddress(0x30);
                 delay(10);
             }
+        } else {
+            logger("Unknown external sensor type configured, continuing without it.", "Sensor", LOG_WARNING);
         }
+    }
+
+    if (!externalSensorAvailable) {
+        setExtSensorData("{}");
     }
 }
 
@@ -224,7 +221,6 @@ void sensorLoop() {
     float temp = appConfig.temperature;
     float humid = appConfig.humidity;
     float pressure = appConfig.pressure;
-    float lux = appConfig.lux;
 
     #ifdef HW1
         if (baseSensorAvailable) {
@@ -244,13 +240,11 @@ void sensorLoop() {
 
     // convert to fahrenheit if set so
     bool isCelsius = (appConfig.tempUnit == 0) ? true : false;
-    if (baseSensorAvailable && !isCelsius) {
+    if (!isCelsius) {
         temp = (temp * 9.0 / 5.0) + 32.0;
     }
 
-    if (lightSensorAvailable) {
-        lux = lightMeter.readLightLevel();
-    }
+    float lux = lightMeter.readLightLevel();
 
 
     // external sensors
@@ -273,7 +267,9 @@ void sensorLoop() {
             JsonDocument doc;
             doc["temperature"] = temperature.temperature;
             doc["humidity"] = humidity.relative_humidity;
-            serializeJson(doc, appConfig.extSensorData);
+            String extSensorJson;
+            serializeJson(doc, extSensorJson);
+            setExtSensorData(extSensorJson);
 
         } else if (appConfig.externalSensor == 2 || appConfig.externalSensor == 3) { // SCD40 or SCD41
             
@@ -300,7 +296,9 @@ void sensorLoop() {
             doc["co2"] = co2;
             doc["temperature"] = temperature;
             doc["humidity"] = humidity;
-            serializeJson(doc, appConfig.extSensorData);
+            String extSensorJson;
+            serializeJson(doc, extSensorJson);
+            setExtSensorData(extSensorJson);
 
             // mqtt update
             String payload = String(co2);
@@ -324,7 +322,9 @@ void sensorLoop() {
                     doc["eco2"] = eCO2;
                     doc["tvoc"] = TVOC;
                     doc["temperature"] = temperature;
-                    serializeJson(doc, appConfig.extSensorData);
+                    String extSensorJson;
+                    serializeJson(doc, extSensorJson);
+                    setExtSensorData(extSensorJson);
 
                     // mqtt update
                     String payload = String(eCO2);
@@ -347,7 +347,9 @@ void sensorLoop() {
             JsonDocument doc;
             doc["lux"] = vlLux;
             doc["range"] = range;
-            serializeJson(doc, appConfig.extSensorData);
+            String extSensorJson;
+            serializeJson(doc, extSensorJson);
+            setExtSensorData(extSensorJson);
 
             // mqtt update
             //String payload = String(range);
