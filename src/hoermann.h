@@ -349,7 +349,7 @@ class HoermannGarageEngine {
 
         return val;
     }
-    
+
     /**
      * Write on 0x9D31+2 , byte1: current state
      */

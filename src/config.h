@@ -26,7 +26,7 @@
 
 #define PREF_SENSOR_UPDATE_INTERVAL 10000 // 10 seconds
 
-#define PREF_BUZZER_SET false 
+#define PREF_BUZZER_SET false
 #define PREF_BUZZER_TUNE 0 // 0 = none, 1 = beep, 2 = alarm, 3 = melody
 #define PREF_BUZZER_OPENING false
 #define PREF_BUZZER_CLOSING false
