@@ -101,6 +101,10 @@ void mqttHaPublish(const char* topic, const char* payload, bool retain) {
         return;
     }
 
+    if (!mqttClientHa.connected()) {
+        return;
+    }
+
     if (mqttQueue != NULL) {
         MqttMessage msg;
         strncpy(msg.topic, fullTopic.c_str(), MQTT_TOPIC_LEN - 1);
@@ -609,7 +613,7 @@ void mqttTask(void *parameter) {
                 mqttClientHa.publish(msg.topic, 0, msg.retain, msg.payload);
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
