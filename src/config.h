@@ -10,7 +10,7 @@
 #include <freertos/semphr.h>
 
 // System values
-#define VERSION "0.3.3"
+#define VERSION "0.3.4"
 #define RS_TXD 17
 #define RS_RXD 18
 #define RS_EN 16

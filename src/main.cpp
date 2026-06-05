@@ -145,6 +145,7 @@ void setup() {
 
   // Initialize application config
   initConfig();
+  ensureDebugLogFileExists();
 
   // start garage door connection
   if (appConfig.setupDone) {

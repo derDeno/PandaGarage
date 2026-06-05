@@ -8,7 +8,7 @@
 #include "config.h"
 
 #define MQTT_TOPIC_LEN 128
-#define MQTT_PAYLOAD_LEN 256
+#define MQTT_PAYLOAD_LEN 384
 
 extern AppConfig appConfig;
 
@@ -30,6 +30,10 @@ struct MqttMessage {
 
 QueueHandle_t mqttQueue = NULL;
 TaskHandle_t mqttTaskHandle = NULL;
+char latestLogState[LOG_MSG_LEN] = "";
+char latestLogAttributes[MQTT_PAYLOAD_LEN] = "";
+bool latestLogAvailable = false;
+bool mqttLogPublishInProgress = false;
 
 void mqttTask(void *parameter);
 void initMqttTask();
@@ -37,6 +41,55 @@ void onMqttConnect(bool sessionPresent);
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason);
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
 bool mqttHaReconnect();
+void mqttHaPublish(const char* topic, const char* payload, bool retain);
+
+const char* logLevelToString(LOG_LVL level) {
+    switch (level) {
+        case LOG_DEBUG:
+            return "debug";
+        case LOG_INFO:
+            return "info";
+        case LOG_WARNING:
+            return "warning";
+        case LOG_ERROR:
+            return "error";
+        default:
+            return "none";
+    }
+}
+
+void mqttHaPublishLatestLogState() {
+    if (!latestLogAvailable) {
+        return;
+    }
+
+    mqttHaPublish("/log/state", latestLogState, true);
+    mqttHaPublish("/log/attributes", latestLogAttributes, true);
+}
+
+void mqttHaPublishLogEntry(const String &logData, const String &tag, LOG_LVL level) {
+    String state = logLevelToString(level);
+    state += " - ";
+    state += logData;
+
+    strncpy(latestLogState, state.c_str(), sizeof(latestLogState) - 1);
+    latestLogState[sizeof(latestLogState) - 1] = '\0';
+
+    JsonDocument logAttributes;
+    logAttributes["message"] = logData;
+    logAttributes["tag"] = tag;
+    logAttributes["level"] = logLevelToString(level);
+
+    String attributes;
+    serializeJson(logAttributes, attributes);
+    strncpy(latestLogAttributes, attributes.c_str(), sizeof(latestLogAttributes) - 1);
+    latestLogAttributes[sizeof(latestLogAttributes) - 1] = '\0';
+    latestLogAvailable = true;
+
+    mqttLogPublishInProgress = true;
+    mqttHaPublishLatestLogState();
+    mqttLogPublishInProgress = false;
+}
 
 
 void checkForFirmwareUpdate() {
@@ -113,7 +166,9 @@ void mqttHaPublish(const char* topic, const char* payload, bool retain) {
         msg.payload[MQTT_PAYLOAD_LEN - 1] = '\0';
         msg.retain = retain;
         if (xQueueSend(mqttQueue, &msg, 0) != pdPASS) {
-            logger("MQTT queue full, dropping message for " + fullTopic, "MQTT", LOG_WARNING);
+            if (!mqttLogPublishInProgress) {
+                logger("MQTT queue full, dropping message for " + fullTopic, "MQTT", LOG_WARNING);
+            }
         }
     }
 }
@@ -129,6 +184,7 @@ void mqttHaInitState() {
     mqttHaPublish("/light/state", "OFF", true);
     mqttHaPublish("/cover/state", "closed", true);
     mqttHaPublish("/cover/position", "0", true);
+    mqttHaPublishLatestLogState();
 
     JsonDocument doc;
     doc["installed_version"] = VERSION;
@@ -248,6 +304,17 @@ void mqttHaConfig() {
     luxSensor["icon"] = "mdi:brightness-5";
     luxSensor["dev_cla"] = "illuminance";
     luxSensor["dev"] = device;
+
+    JsonDocument logSensor;
+    logSensor["name"] = "Latest Log Entry";
+    logSensor["uniq_id"] = appConfig.name + String("_latest_log");
+    logSensor["stat_t"] = mqttBase + "/log/state";
+    logSensor["json_attr_t"] = mqttBase + "/log/attributes";
+    logSensor["avty_t"] = availability_topic;
+    logSensor["icon"] = "mdi:text-box-outline";
+    logSensor["ent_cat"] = "diagnostic";
+    logSensor["force_update"] = true;
+    logSensor["dev"] = device;
 
     // update sensor
     // topic: homeassistant/update/pandagarage/config
@@ -392,12 +459,13 @@ void mqttHaConfig() {
 
     
     // serialize
-    String restartConfig, tempConfig, humidityConfig, pressureConfig, luxConfig, updateConfig, lightConfig, ventConfig, halfConfig, toggleConfig, coverConfig;
+    String restartConfig, tempConfig, humidityConfig, pressureConfig, luxConfig, logConfig, updateConfig, lightConfig, ventConfig, halfConfig, toggleConfig, coverConfig;
     serializeJson(restart, restartConfig);
     serializeJson(tempSensor, tempConfig);
     serializeJson(humiditySensor, humidityConfig);
     serializeJson(pressureSensor, pressureConfig);
     serializeJson(luxSensor, luxConfig);
+    serializeJson(logSensor, logConfig);
     serializeJson(updateSensor, updateConfig);
     serializeJson(light, lightConfig);
     serializeJson(vent, ventConfig);
@@ -412,6 +480,7 @@ void mqttHaConfig() {
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/humidity/config")).c_str(), 0, true, humidityConfig.c_str());
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/pressure/config")).c_str(), 0, true, pressureConfig.c_str());
     mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/lux/config")).c_str(), 0, true, luxConfig.c_str());
+    mqttClientHa.publish((String("homeassistant/sensor/") + appConfig.name + String("/latest_log/config")).c_str(), 0, true, logConfig.c_str());
     mqttClientHa.publish((String("homeassistant/update/") + appConfig.name + String("/config")).c_str(), 0, true, updateConfig.c_str());
     mqttClientHa.publish((String("homeassistant/light/") + appConfig.name + String("/light/config")).c_str(), 0, true, lightConfig.c_str());
     mqttClientHa.publish((String("homeassistant/button/") + appConfig.name + String("/vent/config")).c_str(), 0, true, ventConfig.c_str());

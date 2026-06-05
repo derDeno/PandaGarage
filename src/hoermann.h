@@ -427,7 +427,7 @@ class HoermannGarageEngine {
     void setCommand(bool cond, const HoermannCommand *command) {
         if (cond) {
             if (nextCommand != nullptr) {
-                logger("Command queue full, dropping command", "HCP", LOG_WARNING);
+                logger("Command queue full, dropping command", "HCP", LOG_ERROR);
             } else {
                 nextCommand = command;
             }
