@@ -572,7 +572,7 @@ void setupFileRoutes(AsyncWebServer &server) {
 
         }else {
 
-            logger("OTA Firmware update complete, restarting...", "Device", LOG_INFO);
+            logger("OTA Firmware update complete, restarting...", "Device", LOG_WARNING);
 
             AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "OTA Firmware update successful! Rebooting...");
             response->addHeader("Connection", "close");
@@ -593,7 +593,7 @@ void setupFileRoutes(AsyncWebServer &server) {
 
         }else {
 
-            logger("OTA Filesystem update complete, restarting...", "Device", LOG_INFO);
+            logger("OTA Filesystem update complete, restarting...", "Device", LOG_WARNING);
 
             AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "OTA Filesystem update successful! Rebooting...");
             response->addHeader("Connection", "close");
@@ -914,7 +914,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         request->redirect("/");
 
         request->onDisconnect([]() {
-            delay(100);
+            delay(200);
             ESP.restart();
         });
     });
@@ -925,7 +925,7 @@ void setupApiRoutes(AsyncWebServer &server) {
         request->send(200, "application/json", "{\"status\":\"restarting\"}");
 
         request->onDisconnect([]() {
-            delay(100);
+            delay(200);
             ESP.restart();
         });
     });

@@ -38,6 +38,8 @@ enum LOG_LVL {
     LOG_ERROR
 };
 
+void mqttHaPublishLogEntry(const String &logData, const String &tag, LOG_LVL level);
+
 // escape strings for csv output if needed
 String escapeCSVField(const String &field) {
     bool needsQuotes = field.indexOf(';') != -1 ||
@@ -155,6 +157,7 @@ void logTask(void *parameter) {
 
             size_t *fileSize;
             TickType_t *lastTrim;
+            
             if (strcmp(msg.fileName, "/log-access.txt") == 0) {
                 fileSize = &logAccessSize;
                 lastTrim = &lastTrimAccess;
@@ -197,6 +200,17 @@ void initLogger() {
     }
 }
 
+void ensureDebugLogFileExists() {
+    if (appConfig.logLevel == LOG_NONE || LittleFS.exists("/log.csv")) {
+        return;
+    }
+
+    File logFile = LittleFS.open("/log.csv", "a");
+    if (logFile) {
+        logFile.close();
+    }
+}
+
 // log data to serial and file
 void logger(String logData, String tag = "", LOG_LVL level = LOG_DEBUG) {
     // skip logging if the provided level is lower than the configured log level or the configured is 0
@@ -204,15 +218,19 @@ void logger(String logData, String tag = "", LOG_LVL level = LOG_DEBUG) {
         return;
     }
 
+    time_t now = time(nullptr);
+
     // create the log in csv format. time;lvl;tag;data
     String escaped = escapeCSVField(logData);
     String message = String(level) + ";" + tag + ";" + escaped;
+
+    mqttHaPublishLogEntry(logData, tag, level);
 
     // logging set to true so log to file using background task
     if (logQueue != NULL) {
         LogMessage msg;
         msg.fileName = "/log.csv";
-        msg.timestamp = time(nullptr);
+        msg.timestamp = now;
         strncpy(msg.data, message.c_str(), LOG_MSG_LEN - 1);
         msg.data[LOG_MSG_LEN - 1] = '\0';
         if (xQueueSend(logQueue, &msg, 0) != pdPASS) {
