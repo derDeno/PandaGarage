@@ -1,0 +1,17 @@
+ToDO:
+
+x implement event handler
+x implement mqtt
+x implement garage door in webui
+x implement sensors on webui
+x implement webui login
+x improve webui control layout
+x implement webui control api
+x external sensors setup
+x melody playback
+x access log for mqtt
+x add more melody
+- play melody on open / close for the whole movement length
+x dig deeper into logging with file / sse
+x update default pwd translations
+- add controll watch dog to trigger action again if it was not captured first time
