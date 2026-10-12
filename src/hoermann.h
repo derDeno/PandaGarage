@@ -215,15 +215,6 @@ class HoermannGarageEngine {
         mb.begin(&RS485, RS_EN, true);
         mb.slave(SLAVE_ID);
 
-        xTaskCreatePinnedToCore(
-            modbusServeTask,            /* Function to implement the task */
-            "ModBusTask",               /* Name of the task */
-            10000,                      /* Stack size in words */
-            NULL,                       /* Task input parameter */
-            configMAX_PRIORITIES - 1,   /* Priority of the task */
-            &modBusTask,                /* Task handle. */
-            1);                         /* Core where the task should run */
-
         // Required for Write
         mb.addHreg(0x9C41, 0, 0x03);  // Commands
         mb.addHreg(0x9D31, 0, 0x09);  // Broadcast
@@ -247,6 +238,10 @@ class HoermannGarageEngine {
         mb.onSet(
             HREG(0x9D31 + 6), [this](TRegister *reg, uint16_t val) -> uint16_t { return this->onLampState(reg, val); },
             0x01);
+
+        // Start receiving only after the registers and callbacks are ready.
+        xTaskCreatePinnedToCore(modbusServeTask, "ModBusTask", 10000, NULL,
+                                configMAX_PRIORITIES - 1, &modBusTask, 1);
     }
 
     void handleModbus() {
@@ -262,6 +257,11 @@ class HoermannGarageEngine {
 
         // Command Requst (Internal State representation)
         if (fc == Modbus::FC_READWRITE_REGS && data.regWrite.address == 0x9C41 && data.regWriteCount == 0x02 && data.regRead.address == 0x9CB9 && data.regReadCount == 0x08) {
+            unsigned long now = millis();
+            if (lastCommandPollAt != 0 && now - lastCommandPollAt > 1000) {
+                logger("Command poll gap: " + String(now - lastCommandPollAt) + " ms", "HCP", LOG_WARNING);
+            }
+            lastCommandPollAt = now;
             mb.Reg(HREG(0x9CB9 + 0), (uint16_t)0x0000);
             mb.Reg(HREG(0x9CB9 + 1), (uint16_t)0x0001);
             setCommandValuesToRead();
@@ -305,20 +305,20 @@ class HoermannGarageEngine {
         uint16_t regPlug3Value = 0x0000;
 
         if (nextCommand != nullptr) {
-            // erster Pulse: Startwert senden
+            // Keep the start value on every poll until the keypress has lasted 100 ms.
             if (commandWrittenOn == 0) {
-                regPlug2Value = nextCommand->commandRegPlus2Value;
-                regPlug3Value = nextCommand->commandRegPlus3Value;
-                logger("command start " + String(regPlug2Value) + " " + String(regPlug3Value), "HCP", LOG_DEBUG);
                 commandWrittenOn = millis();
+                logger("command start " + String(nextCommand->commandRegPlus2Value) + " " + String(nextCommand->commandRegPlus3Value), "HCP", LOG_DEBUG);
             }
-            // zweiter Pulse: Endwert senden und Befehl abschließen
-            else if (commandWrittenOn != 0 && (commandWrittenOn + SIMULATEKEYPRESSDELAYMS) < millis()) {
+            if (millis() - commandWrittenOn >= SIMULATEKEYPRESSDELAYMS) {
                 regPlug2Value = nextCommand->commandEndPlus2Value;
                 regPlug3Value = nextCommand->commandEndPlus3Value;
                 logger("command dispose " + String(regPlug2Value) + " " + String(regPlug3Value), "HCP", LOG_DEBUG);
                 commandWrittenOn = 0;
                 nextCommand = nullptr;
+            } else {
+                regPlug2Value = nextCommand->commandRegPlus2Value;
+                regPlug3Value = nextCommand->commandRegPlus3Value;
             }
         }
 
@@ -427,7 +427,9 @@ class HoermannGarageEngine {
     void setCommand(bool cond, const HoermannCommand *command) {
         if (cond) {
             if (nextCommand != nullptr) {
-                logger("Command queue full, dropping command", "HCP", LOG_ERROR);
+                logger("Command queue full, dropping command; last poll " +
+                       (lastCommandPollAt ? String(millis() - lastCommandPollAt) + " ms ago" : String("never")),
+                       "HCP", LOG_ERROR);
             } else {
                 nextCommand = command;
             }
@@ -479,6 +481,7 @@ class HoermannGarageEngine {
     ModbusRTU mb;                                  // ModbusRTU instance, the man behind the curtain
     const HoermannCommand *nextCommand = nullptr;  // Next Command to transmit
     unsigned long commandWrittenOn = 0;            // When was last command written (wait 100ms before end of command is transmitted)
+    unsigned long lastCommandPollAt = 0;
 };
 
 HoermannGarageEngine *hoermannEngine = new HoermannGarageEngine();

@@ -577,7 +577,7 @@ void mqttHaListen(const char* topic, const char* payload, unsigned int length) {
 void onMqttConnect(bool sessionPresent) {
     mqttConnectInProgress = false;
     nextMqttReconnectAttempt = 0;
-    logger("Connected to Home Assistant", "MQTT", LOG_DEBUG);
+    logger("Connected to Home Assistant", "MQTT", LOG_INFO);
 
     if(!configSent) {
         mqttHaConfig();
@@ -590,7 +590,7 @@ void onMqttConnect(bool sessionPresent) {
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-    logger("Disconnected from Home Assistant", "MQTT", LOG_WARNING);
+    logger("Disconnected from Home Assistant", "MQTT", LOG_ERROR);
     mqttInitState = false;
     mqttConnectInProgress = false;
     nextMqttReconnectAttempt = millis() + MQTT_RECONNECT_INTERVAL;

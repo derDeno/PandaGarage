@@ -4,3 +4,9 @@
 .vscode/launch.json
 .vscode/ipch
 build
+debug
+scripts
+what-changed.md
+compile_commands.json
+TODO
+.vscode/
