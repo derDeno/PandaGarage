@@ -1,0 +1,36 @@
+# License
+
+Copyright (c) 2026 derDeno (aka DNO)
+
+This repository contains different kinds of material. The license for each part is:
+
+| Material | License |
+| --- | --- |
+| Software, source code, and firmware | [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) |
+| Hardware and design files, including CAD, PCB, schematics, and other design documents | [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode) |
+
+The license terms apply only to the material identified above that derDeno has the right to license. Third-party material may be subject to other terms; see its accompanying notices.
+
+## Software and firmware
+
+Software and firmware in this repository are licensed under the PolyForm Noncommercial License 1.0.0. The license text is available at:
+
+<https://polyformproject.org/licenses/noncommercial/1.0.0>
+
+Required Notice: Copyright (c) 2026 derDeno (https://github.com/derDeno/PandaGarage)
+
+When distributing any part of the software or firmware, include a copy of the PolyForm license or the URL above, and the Required Notice shown here, as the license requires.
+
+## Hardware and design files
+
+Hardware and design files in this repository are licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International Public License (CC BY-NC-SA 4.0). The complete legal code is available at:
+
+<https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode>
+
+Attribution: derDeno (aka DNO), PandaGarage, https://github.com/derDeno/PandaGarage, licensed under CC BY-NC-SA 4.0. Changes, if any, must be indicated when sharing the material or adaptations.
+
+## Scope and exclusions
+
+These licenses do not grant rights to trademarks, logos, or other materials unless they are specifically identified above. They do not license rights that [COPYRIGHT HOLDER] does not own or have authority to license. CC BY-NC-SA 4.0 licenses copyright and similar rights in the design files; it does not grant patent rights, and it may not restrict making physical products where copyright does not apply. If you need to restrict commercial manufacture of physical hardware, get advice on a hardware-specific license or custom terms.
+
+If it is unclear which license applies to a file, contact using GitHub Issues.
